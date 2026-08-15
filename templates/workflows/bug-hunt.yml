@@ -63,7 +63,7 @@ jobs:
       - name: Fetch skill
         run: |
           mkdir -p .claude/skills
-          git clone --depth 1 https://github.com/${{ github.repository_owner }}/claude-skills.git /tmp/skills
+          git clone --depth 1 https://github.com/${{ github.repository_owner }}/shrike.git /tmp/skills
           cp -r /tmp/skills/skills/deep-bug-hunter .claude/skills/
           chmod +x .claude/skills/deep-bug-hunter/scripts/*.sh
 

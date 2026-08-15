@@ -1,4 +1,4 @@
-# claude-skills
+# shrike
 
 **New here? Read [SETUP.md](SETUP.md).**
 
@@ -22,18 +22,18 @@ Next.js + TypeScript + Drizzle + Neon.
 Clone once, symlink into every project that needs it:
 
 ```bash
-git clone git@github.com:ananmouaz/claude-skills.git ~/dev/claude-skills
+git clone git@github.com:ananmouaz/shrike.git ~/dev/shrike
 
 # per project
 mkdir -p .claude/skills
-ln -s ~/dev/claude-skills/skills/deep-bug-hunter .claude/skills/deep-bug-hunter
+ln -s ~/dev/shrike/skills/deep-bug-hunter .claude/skills/deep-bug-hunter
 ```
 
 Or install it globally for every project on the machine:
 
 ```bash
 mkdir -p ~/.claude/skills
-ln -s ~/dev/claude-skills/skills/deep-bug-hunter ~/.claude/skills/deep-bug-hunter
+ln -s ~/dev/shrike/skills/deep-bug-hunter ~/.claude/skills/deep-bug-hunter
 ```
 
 `git pull` in the clone updates it everywhere. Add `.claude/skills/` to
@@ -42,7 +42,7 @@ ln -s ~/dev/claude-skills/skills/deep-bug-hunter ~/.claude/skills/deep-bug-hunte
 ### Option B — git submodule (pins a version per project)
 
 ```bash
-git submodule add git@github.com:ananmouaz/claude-skills.git .claude/vendor/skills
+git submodule add git@github.com:ananmouaz/shrike.git .claude/vendor/skills
 ln -s ../vendor/skills/skills/deep-bug-hunter .claude/skills/deep-bug-hunter
 ```
 
@@ -55,7 +55,7 @@ This repo carries a `.claude-plugin/marketplace.json`, so it can be added as a
 marketplace and installed by name:
 
 ```
-/plugin marketplace add ananmouaz/claude-skills
+/plugin marketplace add ananmouaz/shrike
 /plugin install deep-bug-hunter@mouaz-skills
 ```
 

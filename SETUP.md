@@ -3,7 +3,7 @@
 There are **two kinds of repo** here, and mixing them up is the main way this goes
 wrong.
 
-1. **`claude-skills`** — one repo, created once. The skill lives here. It contains no
+1. **`shrike`** — one repo, created once. The skill lives here. It contains no
    application code and reviews nothing by itself.
 2. **Project repos** — Rewado, JobPilot, WhereYahiaEats. These *consume* the skill.
    They get a symlink, optionally a workflow, and their own `review-rules.md`.
@@ -18,14 +18,14 @@ repo — there's nothing there to review.
 ```bash
 cd ~/dev
 # unzip the downloaded folder here, then:
-mv claude-skills-repo claude-skills
-cd claude-skills
+mv shrike-repo shrike
+cd shrike
 
 git init
 git add .
 git commit -m "deep-bug-hunter v0.1"
 
-gh repo create claude-skills --private --source=. --push
+gh repo create shrike --private --source=. --push
 ```
 
 Private is the right call — the stack checklists describe your codebases' internals.
@@ -50,7 +50,7 @@ then roll out.
 ```bash
 cd ~/dev/rewado
 mkdir -p .claude/skills
-ln -s ~/dev/claude-skills/skills/deep-bug-hunter .claude/skills/deep-bug-hunter
+ln -s ~/dev/shrike/skills/deep-bug-hunter .claude/skills/deep-bug-hunter
 echo ".claude/skills/" >> .gitignore
 ```
 
@@ -71,7 +71,7 @@ to name the phrasing you actually use.
 ### Seed the rules file
 
 ```bash
-cp ~/dev/claude-skills/templates/review-rules.example.md ./review-rules.md
+cp ~/dev/shrike/templates/review-rules.example.md ./review-rules.md
 ```
 
 Edit it down to invariants that are true for *this* project, delete the rest, and
@@ -81,7 +81,7 @@ commit it. Three real invariants beat twenty copied ones.
 
 ```bash
 mkdir -p .github/workflows
-cp ~/dev/claude-skills/templates/workflows/bug-hunt.yml .github/workflows/
+cp ~/dev/shrike/templates/workflows/bug-hunt.yml .github/workflows/
 ```
 
 Then edit three things in that file:
@@ -99,12 +99,12 @@ Add secrets:
 gh secret set ANTHROPIC_API_KEY --repo ananmouaz/rewado
 ```
 
-If `claude-skills` is private, `GITHUB_TOKEN` cannot reach it from another repo. Create
-a fine-grained PAT with read access to `claude-skills`, add it as `SKILLS_TOKEN`, and
+If `shrike` is private, `GITHUB_TOKEN` cannot reach it from another repo. Create
+a fine-grained PAT with read access to `shrike`, add it as `SKILLS_TOKEN`, and
 change the clone line to:
 
 ```bash
-git clone --depth 1 https://x-access-token:${{ secrets.SKILLS_TOKEN }}@github.com/ananmouaz/claude-skills.git /tmp/skills
+git clone --depth 1 https://x-access-token:${{ secrets.SKILLS_TOKEN }}@github.com/ananmouaz/shrike.git /tmp/skills
 ```
 
 ---
@@ -116,8 +116,8 @@ Skip this until you have a reason.
 ```bash
 cd ~/dev/rewado
 mkdir -p .agents
-cp ~/dev/claude-skills/adapters/bug-hunt.prompt.md .agents/
-cat ~/dev/claude-skills/adapters/AGENTS.md >> AGENTS.md
+cp ~/dev/shrike/adapters/bug-hunt.prompt.md .agents/
+cat ~/dev/shrike/adapters/AGENTS.md >> AGENTS.md
 ```
 
 Cursor: copy the same prompt to `.cursor/rules/bug-hunt.mdc` and set it to
@@ -147,7 +147,7 @@ week one is how the tool gets deleted in week two.
 ## Updating
 
 ```bash
-cd ~/dev/claude-skills
+cd ~/dev/shrike
 # edit skills/deep-bug-hunter/...
 ./scripts/build_portable.sh          # keep the flat build in sync
 git commit -am "tighten falsification pass" && git push
