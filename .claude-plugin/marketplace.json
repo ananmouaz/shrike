@@ -1,14 +1,18 @@
 {
-  "name": "mouaz-skills",
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "shrike",
+  "description": "Shrike — forensic, high-precision bug hunting for AI coding agents.",
   "owner": {
-    "name": "Mouaz"
+    "name": "Mouaz",
+    "url": "https://github.com/ananmouaz"
   },
   "plugins": [
     {
       "name": "deep-bug-hunter",
       "source": "./",
       "description": "Forensic high-precision bug hunting on diffs and PRs. Returns only correctness bugs backed by a concrete failure scenario — a local replacement for BugBot, CodeRabbit, and Macroscope.",
-      "version": "0.1.0"
+      "version": "0.1.0",
+      "category": "productivity"
     }
   ]
 }

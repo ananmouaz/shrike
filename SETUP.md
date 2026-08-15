@@ -54,7 +54,17 @@ There are two wiring paths. Pick the one your agent supports:
 - **Portable-prompt path** — for everything else (Codex, Cursor, Gemini CLI, Aider,
   Cline, Continue, raw API). Same hunt, flattened.
 
-### Agent Skills path — the symlink
+### Agent Skills path
+
+Claude Code: skip the clone entirely —
+
+```
+/plugin marketplace add ananmouaz/shrike
+/plugin install deep-bug-hunter@shrike
+```
+
+Or wire it manually with a symlink (works for any skill-loading agent, and gives you
+a local checkout to hack on):
 
 ```bash
 cd ~/dev/rewado

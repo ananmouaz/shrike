@@ -47,9 +47,22 @@ The universal path. No skill loader required:
 `scripts/build_portable.sh` regenerates `dist/bug-hunt.flat.md` — run it after editing
 the skill so the two don't drift.
 
-### Agents with Agent Skills support (Claude Code, and others adopting the format)
+### Claude Code — two commands
 
-**Option A — one repo, symlinked (simplest, always works).** Clone once, symlink into
+```
+/plugin marketplace add ananmouaz/shrike
+/plugin install deep-bug-hunter@shrike
+```
+
+That's it. The repo is a plugin marketplace (`.claude-plugin/marketplace.json` +
+`plugin.json`), so the skill installs and updates like any other plugin.
+
+### Agents with Agent Skills support — clone-based alternatives
+
+For agents adopting the `SKILL.md` format without a plugin system, or when you want
+tighter control over versions:
+
+**Option A — one repo, symlinked (always works).** Clone once, symlink into
 every project that needs it:
 
 ```bash
@@ -80,18 +93,9 @@ ln -s ../vendor/skills/skills/deep-bug-hunter .claude/skills/deep-bug-hunter
 Good when you want a project to stay on a known-good version of the skill and
 update deliberately.
 
-**Option C — plugin marketplace (Claude Code only).** This repo carries a
-`.claude-plugin/marketplace.json`, so it can be added as a marketplace and installed
-by name:
-
-```
-/plugin marketplace add ananmouaz/shrike
-/plugin install deep-bug-hunter@mouaz-skills
-```
-
-Nicest ergonomics, but the manifest schema has changed over time — check
-https://docs.claude.com/en/docs/claude-code/overview and fix the manifest if the
-install errors. Options A and B have no schema to get wrong.
+If the marketplace install ever errors after a schema change, check
+https://docs.claude.com/en/docs/claude-code/overview and fix the manifest — Options A
+and B have no schema to get wrong.
 
 ---
 
