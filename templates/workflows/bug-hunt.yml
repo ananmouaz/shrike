@@ -1,0 +1,96 @@
+name: Deep Bug Hunt
+
+# Runs the deep-bug-hunter skill on pull requests, replacing BugBot/CodeRabbit.
+# Quiet by design: posts one comment, and only when there is something to say.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  # Manual re-run: comment "/bughunt" on a PR
+  issue_comment:
+    types: [created]
+
+# Don't burn tokens re-reviewing a branch that's still being pushed to.
+concurrency:
+  group: bughunt-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  hunt:
+    # Skip drafts, skip bot PRs, and for comments only fire on /bughunt
+    if: |
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.draft == false &&
+       github.event.pull_request.user.type != 'Bot') ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request != null &&
+       contains(github.event.comment.body, '/bughunt'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so the skill can compute a real merge-base for the diff
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.head_ref }}
+
+      # --- Deterministic pass dependencies (trim to your actual stack) ---
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install JS deps
+        run: npm ci --ignore-scripts
+        continue-on-error: true
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+        continue-on-error: true
+      - name: Install Dart deps
+        run: flutter pub get
+        continue-on-error: true
+
+      - name: Install ripgrep
+        run: sudo apt-get update -qq && sudo apt-get install -y ripgrep
+
+      # --- Make the skill available to Claude Code in this run ---
+      - name: Fetch skill
+        run: |
+          mkdir -p .claude/skills
+          git clone --depth 1 https://github.com/${{ github.repository_owner }}/claude-skills.git /tmp/skills
+          cp -r /tmp/skills/skills/deep-bug-hunter .claude/skills/
+          chmod +x .claude/skills/deep-bug-hunter/scripts/*.sh
+
+      - name: Run deep bug hunt
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Use the deep-bug-hunter skill in .claude/skills/deep-bug-hunter to review
+            this pull request. Read SKILL.md first and follow all six phases in order,
+            including the falsification pass. Do not skip Phase 4.
+
+            Base branch: ${{ github.event.pull_request.base.ref }}
+            Head SHA:    ${{ github.event.pull_request.head.sha }}
+
+            Get the diff with:
+              git diff origin/${{ github.event.pull_request.base.ref }}...HEAD
+
+            The full repository is checked out — use it. The highest-value work is
+            finding callers of changed symbols outside the diff.
+
+            When finished, post the report as ONE pull request comment using the gh
+            CLI. Do not post inline review comments — one comment keeps the signal
+            concentrated. If nothing survives the evidence bar, post the short
+            zero-findings report with the "Checked and cleared" list. Do not pad it.
+          claude_args: |
+            --allowedTools "Bash,Read,Glob,Grep,Edit,Write"
+            --max-turns 60
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
