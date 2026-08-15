@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Flatten the Claude skill into a single self-contained prompt for agents that
+# Flatten the skill into a single self-contained prompt for agents that
 # have no progressive disclosure (Codex, Cursor, Gemini CLI, raw API calls).
 #
 # Usage: scripts/build_portable.sh [output_path]
@@ -16,7 +16,7 @@ mkdir -p "$(dirname "$OUT")"
   echo "<!-- built $(date -u +%Y-%m-%dT%H:%M:%SZ) -->"
   echo
 
-  # SKILL.md without the YAML frontmatter (meaningless outside Claude)
+  # SKILL.md without the YAML frontmatter (meaningless to agents without a skill loader)
   awk 'BEGIN{n=0} /^---$/{n++; next} n>=2' "$SKILL/SKILL.md"
 
   echo

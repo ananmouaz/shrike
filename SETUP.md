@@ -6,7 +6,8 @@ wrong.
 1. **`shrike`** — one repo, created once. The skill lives here. It contains no
    application code and reviews nothing by itself.
 2. **Project repos** — Rewado, JobPilot, WhereYahiaEats. These *consume* the skill.
-   They get a symlink, optionally a workflow, and their own `review-rules.md`.
+   They get a symlink or a prompt file, optionally a workflow, and their own
+   `review-rules.md`.
 
 The workflow file is in `templates/` precisely because it must not run in the skills
 repo — there's nothing there to review.
@@ -45,10 +46,19 @@ Should print a word count and write `dist/bug-hunt.flat.md`.
 Pick the project where you'd most miss BugBot. Do that one, use it for two weeks,
 then roll out.
 
-### Local use — the symlink
+There are two wiring paths. Pick the one your agent supports:
+
+- **Agent Skills path** — for agents with a skill loader (Claude Code, and others
+  adopting the `SKILL.md` format). The agent loads references on demand, so it's the
+  cheapest on context.
+- **Portable-prompt path** — for everything else (Codex, Cursor, Gemini CLI, Aider,
+  Cline, Continue, raw API). Same hunt, flattened.
+
+### Agent Skills path — the symlink
 
 ```bash
 cd ~/dev/rewado
+# path shown for Claude Code; adjust for your agent's skills dir
 mkdir -p .claude/skills
 ln -s ~/dev/shrike/skills/deep-bug-hunter .claude/skills/deep-bug-hunter
 echo ".claude/skills/" >> .gitignore
@@ -57,10 +67,9 @@ echo ".claude/skills/" >> .gitignore
 The symlink is gitignored because it points at a path that only exists on your
 machine. Teammates run the same two commands with their own clone path.
 
-Test it:
+Test it in your agent:
 
-```bash
-claude
+```
 > hunt for bugs in the diff against main
 ```
 
@@ -68,7 +77,23 @@ If it doesn't trigger on its own, say `use the deep-bug-hunter skill` explicitly
 skill that won't auto-trigger usually means the `description` in the frontmatter needs
 to name the phrasing you actually use.
 
+### Portable-prompt path — any other agent
+
+```bash
+cd ~/dev/rewado
+mkdir -p .agents
+cp ~/dev/shrike/adapters/bug-hunt.prompt.md .agents/
+cat ~/dev/shrike/adapters/AGENTS.md >> AGENTS.md
+```
+
+Codex reads `AGENTS.md` automatically. Cursor: copy the same prompt to
+`.cursor/rules/bug-hunt.mdc` and set it to agent-requested rather than always-on.
+Gemini CLI: append the pointer to `GEMINI.md` instead. Raw API: send
+`dist/bug-hunt.flat.md` as the system prompt.
+
 ### Seed the rules file
+
+Either path, do this:
 
 ```bash
 cp ~/dev/shrike/templates/review-rules.example.md ./review-rules.md
@@ -83,6 +108,9 @@ commit it. Three real invariants beat twenty copied ones.
 mkdir -p .github/workflows
 cp ~/dev/shrike/templates/workflows/bug-hunt.yml .github/workflows/
 ```
+
+The shipped workflow uses Claude Code as the CI runtime; to run another agent, swap
+the run step for that agent's CLI and feed it `dist/bug-hunt.flat.md`.
 
 Then edit three things in that file:
 
@@ -109,23 +137,7 @@ git clone --depth 1 https://x-access-token:${{ secrets.SKILLS_TOKEN }}@github.co
 
 ---
 
-## Part 3 — Other agents (only if you actually use them)
-
-Skip this until you have a reason.
-
-```bash
-cd ~/dev/rewado
-mkdir -p .agents
-cp ~/dev/shrike/adapters/bug-hunt.prompt.md .agents/
-cat ~/dev/shrike/adapters/AGENTS.md >> AGENTS.md
-```
-
-Cursor: copy the same prompt to `.cursor/rules/bug-hunt.mdc` and set it to
-agent-requested rather than always-on.
-
----
-
-## Part 4 — Measure before scaling
+## Part 3 — Measure before scaling
 
 Run it on ~10 PRs where you already know what's in them. Track one number:
 **dismissed findings per review.**

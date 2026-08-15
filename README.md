@@ -1,8 +1,13 @@
-# shrike
+# Shrike
+
+Forensic, high-precision bug hunting for AI coding agents.
 
 **New here? Read [SETUP.md](SETUP.md).**
 
-Personal Claude skills. Currently: `deep-bug-hunter`.
+Shrike is agent-neutral. The hunt itself is plain markdown that any capable agent can
+follow — Claude Code, Codex, Cursor, Gemini CLI, Aider, Cline, Continue, or a raw API
+call. Anything that can read files and run shell commands can run it. Currently one
+skill: `deep-bug-hunter`.
 
 ## deep-bug-hunter
 
@@ -13,18 +18,44 @@ suggestions. Zero findings is a valid and common output.
 Built to replace BugBot / CodeRabbit / Macroscope. Tuned for Flutter/Dart and
 Next.js + TypeScript + Drizzle + Neon.
 
+## What's in the repo
+
+| Path | What it is |
+|---|---|
+| `skills/deep-bug-hunter/` | The source of truth: the methodology in the Agent Skills format (`SKILL.md` + on-demand references) |
+| `dist/bug-hunt.flat.md` | The whole skill flattened into one self-contained file, for agents with no progressive disclosure |
+| `adapters/` | Drop-in wiring for `AGENTS.md`-convention agents |
+| `templates/` | A starter `review-rules.md` and a GitHub Actions workflow |
+| `scripts/build_portable.sh` | Regenerates `dist/` from `skills/` |
+
 ---
 
 ## Install
 
-### Option A — one repo, symlinked (simplest, always works)
+### Any agent — the portable prompt
 
-Clone once, symlink into every project that needs it:
+The universal path. No skill loader required:
+
+| Agent | How to wire it |
+|---|---|
+| Codex | Copy `adapters/bug-hunt.prompt.md` to `.agents/` in the target repo, append `adapters/AGENTS.md` to its `AGENTS.md` |
+| Cursor | `adapters/bug-hunt.prompt.md` → `.cursor/rules/bug-hunt.mdc`, set to manual/agent-requested |
+| Gemini CLI | Append the `AGENTS.md` pointer to `GEMINI.md`, same prompt file |
+| Aider / Cline / Continue | Point the conventions/rules file at `bug-hunt.prompt.md` |
+| Raw API | Send `dist/bug-hunt.flat.md` as the system prompt; needs file-read + shell tools |
+
+`scripts/build_portable.sh` regenerates `dist/bug-hunt.flat.md` — run it after editing
+the skill so the two don't drift.
+
+### Agents with Agent Skills support (Claude Code, and others adopting the format)
+
+**Option A — one repo, symlinked (simplest, always works).** Clone once, symlink into
+every project that needs it:
 
 ```bash
 git clone git@github.com:ananmouaz/shrike.git ~/dev/shrike
 
-# per project
+# per project (path shown for Claude Code; adjust for your agent's skills dir)
 mkdir -p .claude/skills
 ln -s ~/dev/shrike/skills/deep-bug-hunter .claude/skills/deep-bug-hunter
 ```
@@ -39,7 +70,7 @@ ln -s ~/dev/shrike/skills/deep-bug-hunter ~/.claude/skills/deep-bug-hunter
 `git pull` in the clone updates it everywhere. Add `.claude/skills/` to
 `.gitignore` in consuming repos if you don't want the symlink committed.
 
-### Option B — git submodule (pins a version per project)
+**Option B — git submodule (pins a version per project).**
 
 ```bash
 git submodule add git@github.com:ananmouaz/shrike.git .claude/vendor/skills
@@ -49,10 +80,9 @@ ln -s ../vendor/skills/skills/deep-bug-hunter .claude/skills/deep-bug-hunter
 Good when you want a project to stay on a known-good version of the skill and
 update deliberately.
 
-### Option C — plugin marketplace
-
-This repo carries a `.claude-plugin/marketplace.json`, so it can be added as a
-marketplace and installed by name:
+**Option C — plugin marketplace (Claude Code only).** This repo carries a
+`.claude-plugin/marketplace.json`, so it can be added as a marketplace and installed
+by name:
 
 ```
 /plugin marketplace add ananmouaz/shrike
@@ -67,17 +97,21 @@ install errors. Options A and B have no schema to get wrong.
 
 ## Run it locally
 
-```bash
-claude
+In whatever agent you wired up:
+
+```
 > hunt for bugs in this branch
 ```
 
-The description is written to trigger on "review this PR", "did I break anything",
-"is this safe to merge", and similar. To force it:
+The skill description is written to trigger on "review this PR", "did I break
+anything", "is this safe to merge", and similar. To force it:
 
 ```
 > use the deep-bug-hunter skill on the diff against main
 ```
+
+For agents using the portable prompt, replace `{{TARGET}}` in
+`adapters/bug-hunt.prompt.md` (or just tell the agent what to review).
 
 ---
 
@@ -89,6 +123,10 @@ Copy `templates/workflows/bug-hunt.yml` into the repo you want reviewed, then:
 2. Edit the "Fetch skill" step to point at your actual skills repo URL.
 3. Trim the dependency setup steps to your real stack — the Flutter steps are dead
    weight on a Next.js repo and vice versa.
+
+The shipped workflow runs the hunt with Claude Code as the CI runtime. To run it on a
+different agent, swap the run step for that agent's CLI and feed it
+`dist/bug-hunt.flat.md` — the hunt itself doesn't change.
 
 Behaviour:
 - Runs on PR open / push / ready-for-review. **Skips drafts and bot PRs.**
@@ -148,22 +186,3 @@ Before trusting it, run it on ~10 PRs where you already know the answer and trac
 **dismissed-comment rate**. If precision is low: raise the severity threshold, shrink
 the cap, and strengthen the falsification pass. If real bugs slip through: widen
 context retrieval (more caller traversal) before loosening the evidence bar.
-
----
-
-## Other agents (Codex, Cursor, Gemini CLI, Aider, raw API)
-
-See `adapters/`. The workflow itself is agent-neutral markdown; only the *loading
-mechanism* is Claude-specific.
-
-| Agent | How to wire it |
-|---|---|
-| Codex | Copy `adapters/bug-hunt.prompt.md` to `.agents/` in the target repo, append `adapters/AGENTS.md` to its `AGENTS.md` |
-| Cursor | `adapters/bug-hunt.prompt.md` → `.cursor/rules/bug-hunt.mdc`, set to manual/agent-requested |
-| Gemini CLI | Append the `AGENTS.md` pointer to `GEMINI.md`, same prompt file |
-| Aider / Cline / Continue | Point the conventions/rules file at `bug-hunt.prompt.md` |
-| Raw API | Send `dist/bug-hunt.flat.md` as the system prompt; needs file-read + shell tools |
-
-`scripts/build_portable.sh` regenerates `dist/bug-hunt.flat.md` — the whole skill
-flattened into one file for agents with no progressive disclosure. Run it after
-editing the skill so the two don't drift.
