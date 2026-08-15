@@ -23,6 +23,7 @@ Next.js + TypeScript + Drizzle + Neon.
 | Path | What it is |
 |---|---|
 | `skills/deep-bug-hunter/` | The source of truth: the methodology in the Agent Skills format (`SKILL.md` + on-demand references) |
+| `commands/` | Slash commands the plugin adds to Claude Code (`/shrike-review`) |
 | `dist/bug-hunt.flat.md` | The whole skill flattened into one self-contained file, for agents with no progressive disclosure |
 | `adapters/` | Drop-in wiring for `AGENTS.md`-convention agents |
 | `templates/` | A starter `review-rules.md` and a GitHub Actions workflow |
@@ -56,6 +57,15 @@ the skill so the two don't drift.
 
 That's it. The repo is a plugin marketplace (`.claude-plugin/marketplace.json` +
 `plugin.json`), so the skill installs and updates like any other plugin.
+
+Installing also adds the `/shrike-review` slash command:
+
+```
+/shrike-review              # hunt the current working diff
+/shrike-review 123          # hunt PR #123
+/shrike-review my-branch    # hunt a branch against main
+/shrike-review src/auth.ts  # hunt one file
+```
 
 ### Agents with Agent Skills support — clone-based alternatives
 
@@ -113,6 +123,9 @@ anything", "is this safe to merge", and similar. To force it:
 ```
 > use the deep-bug-hunter skill on the diff against main
 ```
+
+In Claude Code the plugin also installs `/shrike-review` (see above), which is the
+same hunt with an explicit entry point.
 
 For agents using the portable prompt, replace `{{TARGET}}` in
 `adapters/bug-hunt.prompt.md` (or just tell the agent what to review).
