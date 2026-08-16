@@ -33,65 +33,46 @@ Next.js + TypeScript + Drizzle + Neon.
 
 ## Install
 
-### Any agent — the portable prompt
+The hunt ships in two equivalent formats — pick whichever your agent consumes:
 
-The universal path. No skill loader required:
+- `skills/deep-bug-hunter/` — the Agent Skills format (`SKILL.md` + on-demand
+  references). Cheapest on context for agents with a skill loader.
+- `dist/bug-hunt.flat.md` — the same hunt flattened into one self-contained file,
+  for everything else. `scripts/build_portable.sh` regenerates it after editing the
+  skill so the two don't drift.
 
 | Agent | How to wire it |
 |---|---|
-| Codex | Copy `adapters/bug-hunt.prompt.md` to `.agents/` in the target repo, append `adapters/AGENTS.md` to its `AGENTS.md` |
+| Claude Code | `/plugin marketplace add ananmouaz/shrike`, then `/plugin install deep-bug-hunter@shrike`. Also adds a `/shrike-review` command. |
+| Codex | Copy `adapters/bug-hunt.prompt.md` to `.agents/` in the target repo, append `adapters/AGENTS.md` to its `AGENTS.md`. Copy the prompt to `~/.codex/prompts/shrike-review.md` to get a `/shrike-review` command. |
 | Cursor | `adapters/bug-hunt.prompt.md` → `.cursor/rules/bug-hunt.mdc`, set to manual/agent-requested |
 | Gemini CLI | Append the `AGENTS.md` pointer to `GEMINI.md`, same prompt file |
 | Aider / Cline / Continue | Point the conventions/rules file at `bug-hunt.prompt.md` |
 | Raw API | Send `dist/bug-hunt.flat.md` as the system prompt; needs file-read + shell tools |
 
-`scripts/build_portable.sh` regenerates `dist/bug-hunt.flat.md` — run it after editing
-the skill so the two don't drift.
+### Skill-loader agents — clone-based install
 
-### Claude Code — two commands
+For any agent adopting the `SKILL.md` format, or when you want tighter control over
+versions than a plugin manager gives you:
 
-```
-/plugin marketplace add ananmouaz/shrike
-/plugin install deep-bug-hunter@shrike
-```
-
-That's it. The repo is a plugin marketplace (`.claude-plugin/marketplace.json` +
-`plugin.json`), so the skill installs and updates like any other plugin.
-
-Installing also adds the `/shrike-review` slash command:
-
-```
-/shrike-review              # hunt the current working diff
-/shrike-review 123          # hunt PR #123
-/shrike-review my-branch    # hunt a branch against main
-/shrike-review src/auth.ts  # hunt one file
-```
-
-### Agents with Agent Skills support — clone-based alternatives
-
-For agents adopting the `SKILL.md` format without a plugin system, or when you want
-tighter control over versions:
-
-**Option A — one repo, symlinked (always works).** Clone once, symlink into
-every project that needs it:
+**Option A — one repo, symlinked (always works).** Clone once, symlink into your
+agent's skills directory (shown here as `.claude/skills`; Claude Code's — substitute
+your agent's):
 
 ```bash
 git clone git@github.com:ananmouaz/shrike.git ~/dev/shrike
 
-# per project (path shown for Claude Code; adjust for your agent's skills dir)
+# per project
 mkdir -p .claude/skills
 ln -s ~/dev/shrike/skills/deep-bug-hunter .claude/skills/deep-bug-hunter
-```
 
-Or install it globally for every project on the machine:
-
-```bash
+# or globally, for every project on the machine
 mkdir -p ~/.claude/skills
 ln -s ~/dev/shrike/skills/deep-bug-hunter ~/.claude/skills/deep-bug-hunter
 ```
 
-`git pull` in the clone updates it everywhere. Add `.claude/skills/` to
-`.gitignore` in consuming repos if you don't want the symlink committed.
+`git pull` in the clone updates it everywhere. Add the skills dir to `.gitignore`
+in consuming repos if you don't want the symlink committed.
 
 **Option B — git submodule (pins a version per project).**
 
@@ -102,10 +83,6 @@ ln -s ../vendor/skills/skills/deep-bug-hunter .claude/skills/deep-bug-hunter
 
 Good when you want a project to stay on a known-good version of the skill and
 update deliberately.
-
-If the marketplace install ever errors after a schema change, check
-https://docs.claude.com/en/docs/claude-code/overview and fix the manifest — Options A
-and B have no schema to get wrong.
 
 ---
 
@@ -124,8 +101,15 @@ anything", "is this safe to merge", and similar. To force it:
 > use the deep-bug-hunter skill on the diff against main
 ```
 
-In Claude Code the plugin also installs `/shrike-review` (see above), which is the
-same hunt with an explicit entry point.
+Agents with a command system get an explicit entry point too — `/shrike-review` in
+Claude Code (installed with the plugin) or Codex (via the prompts dir):
+
+```
+/shrike-review              # hunt the current working diff
+/shrike-review 123          # hunt PR #123
+/shrike-review my-branch    # hunt a branch against main
+/shrike-review src/auth.ts  # hunt one file
+```
 
 For agents using the portable prompt, replace `{{TARGET}}` in
 `adapters/bug-hunt.prompt.md` (or just tell the agent what to review).
