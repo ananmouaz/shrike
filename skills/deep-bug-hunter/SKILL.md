@@ -38,6 +38,12 @@ regressions in behavior existing code depends on.
 file layout, "consider extracting", missing comments/docs, test coverage opinions,
 architectural preferences, performance speculation, "this could be more idiomatic",
 deprecation notes without a failure, and anything a formatter or linter emits.
+Also out of scope even though other review tools report them: visual polish
+(layout shift, a skeleton whose height differs from the real content, scroll
+position after an insert), accessibility labelling, and wording preferences. The
+exception is when the surface *asserts something false about the data* — a count
+labelled with the wrong unit, or a caveat that disappears on the branch it
+qualifies — which is a correctness defect and is in scope.
 
 If a finding cannot be phrased as "when X happens, the program does Y, which is
 wrong," it is not a finding. Delete it.
@@ -97,6 +103,9 @@ recur in each ecosystem:
 
 - Flutter / Dart → `references/flutter-dart.md`
 - Next.js / TypeScript / Drizzle / Neon → `references/next-drizzle-neon.md`
+- Code calling a model provider or AI SDK → `references/llm-integration.md`
+  (read this *in addition to* the language checklist, whenever the diff touches
+  prompt construction, tool calling, streaming, or model configuration)
 
 If the stack is something else, use the generic seed taxonomy and say so.
 

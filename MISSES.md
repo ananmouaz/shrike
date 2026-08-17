@@ -5,6 +5,73 @@ of competing reviewers' findings. Each entry records the miss, why the skill mis
 it, the category, and the patch that covers the category. Development artifact — not
 shipped in the flat build (only `skills/deep-bug-hunter/references/*.md` is inlined).
 
+## 2026-08-17 — corpus study 2: karajan, dashboard, platform (45 PRs, Cursor-only)
+
+Second corpus pass over three more repos, and the first **validation** of the seed
+expansion from study 1. Cluster: the 15 most recent bot-reviewed PRs in each of
+`karajan` (Python data/anonymization/LLM-extraction pipeline), `dashboard` (B2B
+analytics/compliance UI), `platform` (SaaS analytics + AI chat). No Macroscope in
+these repos — Cursor BugBot only. **123 findings, 1 noise** (28 High, 73 Medium, 22
+Low). Boilerplate note: Cursor comment bodies are ~85% markup (fix-in-cursor
+buttons, base64 deep links, billing notices); strip on `DESCRIPTION START/END` and
+`LOCATIONS START/END` markers before analysis.
+
+**Validation result: 74/123 (60%) were covered by the post-study-1 taxonomy, and
+every one of those 74 was caught by a seed added in study 1 (20–34).** Coverage by
+repo tracked how backend-shaped the work was: karajan 76% covered, platform 46%,
+dashboard 57%. The residual concentrated in UI-state and semantic-labelling defects
+the taxonomy had no mechanical prompt for.
+
+Residual clusters, added as 13 new seeds:
+
+1. **Count unit vs label** (~10, largest) — pair/join-row counts rendered as
+   distinct entities, two units summed in one badge, a returned count reporting
+   rows attempted rather than rows written, a scoped query result used as global.
+2. **Label/caveat asserting something the data contradicts** (~4) — an explanatory
+   note naming the wrong cause, a caveat attached to the clause it doesn't qualify,
+   a state-agnostic prefix that misreads pending as completed. In scope because the
+   surface misinforms, not because the wording is imperfect.
+3. **Local/draft state keyed to a changeable identity** (~5) — drafts surviving a
+   company switch with no re-key, expansion flags never reset on modal reopen,
+   step reset done in an effect so the first paint shows a leftover armed confirm.
+4. **Cross-source render gating** (~4) — one query's error hiding another's loaded
+   rows, error UI and retry gated behind a query that never settles, imperative
+   `refetch()` running an `enabled: false` query.
+5. **Navigation/link target scope** (~4) — tab links dropping deep-link params, a
+   CTA opening an editor that filters out the offered option, "reset" restoring a
+   hardcoded default over a deep-link-forced one.
+6. **Dismissal-handler side effects** (~3) — outside-press dismissal committing the
+   action the user was replacing; a `pointerdown` guard flag cleared only on click.
+7. **Key/namespace collision** (2) — lossy slug normalization collapsing distinct
+   branches; a renamed preview namespace overlapping CI's, whose cleanup then
+   deleted shared databases.
+8. Singles worth seeds: cleared bulk-limit control meaning "all" rather than
+   "none"; in-flight write unmounted by a filter change the busy lock didn't cover;
+   a predicate built over merged rule kinds applied per kind; a skip path omitting
+   the linkage row the non-skip path writes; a repair handler whose own unguarded
+   `await` fails the whole turn.
+
+Also extended: seed 14 (retry) with fallback fan-out after the primary exhausted its
+retries; seed 31 (migration) with duplicate `down_revision` heads and a DDL lock held
+across a long backfill in the same transaction.
+
+**New reference `llm-integration.md`** — both LLM-heavy repos produced defects with
+no home: hardcoded `mime_type` on multimodal parts, reasoning-block signatures not
+round-tripped on replay, `abortSignal` missing on repair calls, AI SDK error
+contract assumed rather than read, stale hardcoded per-token pricing. SKILL.md now
+directs to it in addition to the language checklist whenever a diff touches prompt
+construction, tool calling, streaming, or model config.
+
+**Scope boundary confirmed, not widened.** ~6 uncovered findings were deliberately
+out of scope: Suspense-fallback height mismatch (x2), scroll position after
+inserting a form, duplicate `aria-label`s, a Tailwind arbitrary-variant escaping bug
+with visual-only effect, and a preset highlighting on hover-preview. The scope
+contract in SKILL.md and the adapter now name these classes explicitly so future
+runs don't drift into reporting them — with the carve-out that a surface asserting
+something false about the data is a correctness defect.
+
+Corpus: `study/karajan-dashboard-platform-corpus-2026-08-17.json`.
+
 ## 2026-08-17 — corpus study: axess-intelligence/rewado, 23 dual-bot PRs
 
 Studied every PR (#782–#861) where both Cursor BugBot and Macroscope posted findings:

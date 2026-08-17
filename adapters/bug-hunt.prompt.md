@@ -25,7 +25,12 @@ invariants, and contract violations between the change and its existing callers.
 
 **Never report:** style, naming, formatting, import order, "consider extracting",
 missing comments or docs, test-coverage opinions, architectural preferences,
-performance speculation, or anything a linter or formatter emits.
+performance speculation, or anything a linter or formatter emits. Also never report
+visual polish (layout shift, skeleton height mismatch, scroll position after an
+insert), accessibility labelling, or wording preferences — even though other review
+tools do. The exception: a surface that *asserts something false about the data* (a
+count labelled with the wrong unit, a caveat that vanishes on the branch it
+qualifies) is a correctness defect and is in scope.
 
 If a finding cannot be phrased as "when X happens, the program does Y, which is
 wrong," it is not a finding. Delete it.
@@ -95,6 +100,29 @@ question that reading code can answer.
 | Guard added or tightened | Which legitimate callers (service jobs, admin paths, NULL-session connections) now fail? Over-restriction is a bug too. |
 | Order without explicit sort / sort key with schema default | Guaranteed or incidental? Sentinel defaults (0) colliding with intended order? |
 | Tool/config invocation | Pinned version supports the keys used? Default combination semantics (OR vs AND)? Every env var read actually set there? |
+| Count/aggregate reaching a label, badge, or another count | What is one unit — entity or pair/join row? Same unit for every consumer, never two units summed? Rows written or rows attempted (pre-dedupe)? Scoped result used as global? |
+| Grouped aggregate / snapshot rebuild | Group with all members excluded — zero row or no row? If no row, does a stale prior value survive and read as current? |
+| Label/tooltip/caveat asserting a fact about the data | Does the claim hold on every branch and state that renders it? Caveat attached to the clause it qualifies? (Test is contradiction, not wording.) |
+| Local/draft/expansion state derived from a prop or selected entity | Reset or re-keyed on identity change (row, tenant, modal reopen)? Resyncs when the prop changes under an open editor? Reset in an effect, so first paint shows a leftover armed confirm? |
+| Render gated on one async source, reading from another | Can an unrelated error hide loaded data, or gate the error UI and retry behind a query that never settles? Does imperative `refetch()` run an `enabled: false` query? |
+| Navigation target / link href / "reset to default" | Carries the current scope and filters, or drops them? Can it land empty or on an option the target filters out? Reset restores the deep-link default or a hardcoded one? |
+| Derived key, slug, tag, branch/namespace name | Two distinct inputs normalizing to one key? Namespace overlapping another environment, so cleanup deletes resources it doesn't own? |
+| Cleared/empty value in a filter, limit, or bulk control | Empty means "no constraint" or "match nothing"? Which does the query do, and what does the label imply — on a bulk destructive action that's the whole table. |
+| In-flight mutation inside a filterable/searchable list | Busy guard covers unmount paths (filter change, search, navigation), or only the submit buttons? |
+| Predicate/precedence computed over merged inputs, applied per subset | Agrees at every level applied (pair vs entity, per-kind vs combined)? |
+| Early-return/continue/skip path in a loop that writes bookkeeping | Which side effects does the non-skip path perform that the skip omits — links, annotations, counters, audit rows? |
+| Recovery/repair/fallback handler doing I/O | What if *it* fails? Unguarded await turns a recoverable error into a failed request. Caller's abort signal threaded in, or does it keep running after cancel? |
+| Dismissal handler (outside-press, blur, escape) with a side effect | When the dismissing click also lands on another control, what's the ordering? Does dismissal commit the action the user was replacing? Guard flag set on pointerdown cleared on every path? |
+
+**If the diff calls a model provider or AI SDK**, add these: hardcoded media type on
+a multimodal part (providers trust the declared type for remote URIs); reasoning /
+thinking blocks persisted without their signature or provider metadata, so replay
+fails; framework error contract assumed rather than read (rethrowing from a repair
+hook may still admit an `invalid` tool call); `abortSignal` omitted on nested
+repair/fallback calls, which keep running and billing after the user cancels;
+fallback fanning out per-item requests after the batch call already exhausted its
+rate-limit retries; hardcoded per-token pricing constants that are stale or not
+date-aware; tool-call arguments trusted as valid schema without a parse step.
 
 ### Phase 3 — Trace each seed → `.bughunt/3-candidates.md`
 
