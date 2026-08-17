@@ -72,6 +72,10 @@ Read to establish, in your own words, before hypothesizing:
   ordering guarantees, side effects, timing?
 - What state persists across calls, requests, rebuilds, or retries?
 - Where does the changed code sit relative to a trust boundary or a transaction?
+- If the changed code is one stage in a multi-stage pipeline over the same data
+  (image passes, middleware chains, sequential transforms), what have the earlier
+  stages already done to that data by the time this stage runs? Never verify a
+  stage against the original input; verify it against what it actually receives.
 
 Then, for every symbol whose contract changed, **find every caller**. This is the
 single highest-yield step in the whole workflow: the most valuable bugs are almost

@@ -45,7 +45,10 @@ only to skip that class of hunting and to locate shaky areas.
 Establish in writing, before hypothesizing: what the change is *for*; which contracts
 changed (signatures, nullability, return shapes, error semantics, ordering, side
 effects); what state persists across calls, requests, rebuilds, or retries; where the
-code sits relative to a trust boundary or transaction.
+code sits relative to a trust boundary or transaction. If the changed code is one
+stage in a multi-stage pipeline over the same data (image passes, middleware chains,
+sequential transforms), establish what earlier stages have already done to that data —
+verify each stage against what it actually receives, not the original input.
 
 Then, for **every symbol whose contract changed, find every caller** and read the call
 sites. This is the highest-yield step in the entire workflow. The most valuable bugs
@@ -77,6 +80,21 @@ question that reading code can answer.
 | Signature change in the diff | Every caller updated? Order, optionality, nullability. |
 | Removed or renamed field | Every reader — including data already persisted. |
 | Date/time arithmetic | Timezone, DST, seconds vs milliseconds. |
+| Ratio / majority gate (`count/total >= threshold`) | Is the denominator filtered (opaque-only, non-null-only, valid-only)? Can the filter shrink it until a few unrepresentative samples decide the gate? Minimum *absolute* count? |
+| Later stage of a multi-pass pipeline | Judged against the state earlier passes leave behind, or against the original input? |
+| Validator / checker / gate code | What input makes it pass when it shouldn't? Fail-open on error, empty, missing file, unparsed syntax? Does the oracle prove the property or a proxy (name exists, keyword present)? |
+| Checkpoint / cursor / high-water mark | Can it advance past skipped, capped, aborted, or failed items? Queue draining gated on an unrelated step's success? |
+| Success signal (return true, success UI) | Do error, aborted, still-loading, empty-because-error states each reach the failure path, or get conflated with success? `?? default` on a null-while-loading value counts. |
+| Paginated / limit-capped read | Aggregate over all pages or just page one? Per-page reduction breaking whole-set semantics? Items beyond the cap? |
+| Constant/default/predicate in multiple places | Every copy updated (client + SQL, two screens, doc + schema)? Grep the old literal. |
+| New variant / route / branch in a flow | Every parallel registry, allowlist, switch default, sibling path updated? Which side effects only fired in the step now bypassed? |
+| Process-global mutable state (static, singleton) | Who else writes/resets it? Can old-instance teardown clobber the newer instance? |
+| Fixed sleep / cron offset as synchronization | What if the other side is slower than the delay? |
+| Destructive consume (pop, clear, mark-done) | Before or after the dependent operation commits? Failure after consume loses the item. |
+| Migration/backfill on existing rows | CASCADE chains enumerated? Concurrent writes during the window missed by both paths? ON CONFLICT DO UPDATE: which columns NOT set? Backfill predicate matches runtime check? |
+| Guard added or tightened | Which legitimate callers (service jobs, admin paths, NULL-session connections) now fail? Over-restriction is a bug too. |
+| Order without explicit sort / sort key with schema default | Guaranteed or incidental? Sentinel defaults (0) colliding with intended order? |
+| Tool/config invocation | Pinned version supports the keys used? Default combination semantics (OR vs AND)? Every env var read actually set there? |
 
 ### Phase 3 — Trace each seed → `.bughunt/3-candidates.md`
 
@@ -158,6 +176,9 @@ edge case). Below Medium, don't report.
 
 Close with **Checked and cleared** — 3–6 things you specifically investigated and ruled
 out, with reasons. This is what makes a zero-finding run trustworthy rather than lazy.
+A clearance must hold in the context the code actually runs in — the state earlier
+pipeline stages leave behind, the real caller set — not just in isolation; "the math
+is internally consistent" clears nothing if those inputs never occur at runtime.
 
 If nothing survives: *"No correctness bugs found that meet the evidence bar."* Do not
 pad with suggestions. Do not soften it into a style review.

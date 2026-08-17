@@ -1,0 +1,1835 @@
+[
+ {
+  "pr": 782,
+  "bots": [
+   "macroscopeapp",
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/auth/services/betterauth_service.dart:729",
+  "bug": "refreshJwtAfter401 returns success after a transiently failed refreshToken() because it only checks the token is locally unexpired, so the caller replays the same server-rejected JWT.",
+  "class": "false-success-on-failure",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 782,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/auth/services/betterauth_service.dart:138",
+  "bug": "Proactive buffer-zone refresh runs signOut() on a rejected session, clearing a still-usable JWT without firing onAuthFailure, leaving AuthNotifier signed-in while the service has no tokens (later StateError).",
+  "class": "error-path-partial-state",
+  "seed_covered": true,
+  "seed": "6. catch block \u2014 swallowed / too broad / partial state",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/rewards/screens/rewards_marketplace_screen.dart:235",
+  "bug": "First-payout threshold is min pointsCost over all rewards including inactive (can_redeem=false) ones, so the card can show progress toward an unredeemable payout amount.",
+  "class": "unfiltered-aggregate",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/app/router/app_router.dart:534",
+  "bug": "Routes.payoutDetails was registered but not added to _gmailGateExemptPaths, so users without connected Gmail are redirected away and can never reach payout details from settings.",
+  "class": "parallel-list-omission",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp",
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/payout_details/screens/payout_details_screen.dart:129",
+  "bug": "_prefill reads userProfileProvider once without watching it, so a profile that resolves after payout details/countries never triggers a rebuild and the country picker silently stays on the hardcoded DE default.",
+  "class": "async-load-order-race",
+  "seed_covered": true,
+  "seed": "4. await/async boundary \u2014 state captured before still valid after",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/payout_details/screens/payout_details_screen.dart:154",
+  "bug": "countriesAsync.asData?.value ?? [] collapses loading and error states to an empty list while Save stays enabled, so a user can submit before/after country-list failure and silently store DE as billing country.",
+  "class": "error-state-collapsed-to-default",
+  "seed_covered": true,
+  "seed": "6. catch block \u2014 swallowed / too broad / partial state",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/api/src/db/migrations/0108_payout_setup_seed.sql:192",
+  "bug": "payout_setup completion guard only checks row existence in user_payment_method/user_address, so empty-string values satisfy it and award 250 points without valid payout data.",
+  "class": "weak-server-validation",
+  "seed_covered": true,
+  "seed": "10. External input reaching sink \u2014 validated at this boundary?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/api/src/db/migrations/0108_payout_setup_seed.sql:98",
+  "bug": "Activation missions are seeded with display_order 1 and 2 but oneTimeMissionsProvider never sorts by displayOrder and fetches created.desc with identical insert timestamps, so on-screen order is undefined.",
+  "class": "unsorted-assumed-order",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/home/providers/home_missions_derivations.dart:150",
+  "bug": "Ascending displayOrder sort places missions with the schema default 0 ahead of the pinned activation missions seeded at 1 and 2, inverting the intended pin-to-top behavior.",
+  "class": "sentinel-default-sort-collision",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/api/src/db/migrations/0108_payout_setup_seed.sql:131",
+  "bug": "A user signing up concurrently with the transactional migration is missed by both the backfill snapshot and assign_missions_on_signup (which cannot see the uncommitted mission rows), permanently receiving neither activation mission.",
+  "class": "race-toctou",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp",
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/payout_details/screens/payout_details_screen.dart:273",
+  "bug": "The country dropdown's onChanged updates _countryCode but never latches _countryDefaulted, so a manual selection made while the profile is still loading is overwritten when the profile resolves, saving the wrong billing country.",
+  "class": "late-async-overwrites-user-input",
+  "seed_covered": true,
+  "seed": "4. await/async boundary \u2014 state captured before still valid after",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/rewards/screens/rewards_marketplace_screen.dart:233",
+  "bug": "After first redemption, Riverpod retains the previous empty payout-history value during invalidation refresh (and indefinitely on refresh error), so hasValue && isEmpty keeps FirstPayoutProgressCard visible when it should be gone.",
+  "class": "stale-cache-during-refresh",
+  "seed_covered": true,
+  "seed": "13. Cache/memo write \u2014 invalidation, cross-tenant leak",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/api/src/db/migrations/0108_payout_setup_seed.sql:61",
+  "bug": "DELETE FROM questionnaire cascades through questionnaire_response and question_answer ON DELETE CASCADE, permanently destroying every existing user's submitted survey responses.",
+  "class": "cascade-delete-data-loss",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "cursor",
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/earning/widgets/missions/mission_action_handler.dart:74",
+  "bug": "The backfilled demographics mission opens DemographicsOnboardingScreen without prefilling from the saved profile; it seeds _birthYear to year-30 and upserts that default even on Skip, silently overwriting the user's real birth year.",
+  "class": "default-overwrites-persisted-data",
+  "seed_covered": true,
+  "seed": "9. Write path \u2014 scoped? transaction? idempotent under retry?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/api/src/db/migrations/0108_payout_setup_seed.sql:186",
+  "bug": "The demographics completion guard checks only birth_year IS NOT NULL (schema allows up to 2100), so a future or under-18 birth year still awards the mission without satisfying the 18+ gate.",
+  "class": "weak-server-validation",
+  "seed_covered": true,
+  "seed": "10. External input reaching sink \u2014 validated at this boundary?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/auth/screens/country_selection_screen.dart:420",
+  "bug": "The new signup flow skips DemographicsOnboardingScreen, which was the only place onboardingCompleted() fired, so onboarding conversion analytics are systematically incomplete for every new signup.",
+  "class": "dropped-side-effect-on-flow-change",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp",
+   "cursor"
+  ],
+  "file": "apps/admin/components/missions/mission-form.tsx:94",
+  "bug": "Editing a payout_setup or demographics mission falls through deriveMissionCategory/deriveBonusContentType defaults and saves missionType 'survey', destroying the activation mission type that mobile routing and complete_mission guards depend on (first fix attempt also missed onSubmit).",
+  "class": "enum-variant-fallthrough",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/admin/components/missions/mission-form.tsx:293",
+  "bug": "isBonus is derived only from missionCategory, which falls back to bonus_mission for payout_setup/demographics, so any admin edit persists system activation missions as isBonus=true and surfaces them on the mobile bonus-mission list.",
+  "class": "enum-variant-fallthrough",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/admin/components/missions/mission-form.tsx:300",
+  "bug": "The isSystemActivationType guard forces targetType 'all' but not assignmentMode, which deriveAssignmentMode sets to 'trigger' when a trigger rule exists, so saving an activation mission updates the trigger rule instead of assigning to all users.",
+  "class": "special-case-not-propagated",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/auth/screens/demographics_onboarding_screen.dart:90",
+  "bug": "_seedFromProfile unconditionally assigns profile.birthYear when the provider resolves, overwriting a selection the user already made on the wheel, and the wheel controller never reacts to the value change so UI and saved state desync.",
+  "class": "late-async-overwrites-user-input",
+  "seed_covered": true,
+  "seed": "4. await/async boundary \u2014 state captured before still valid after",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/auth/screens/demographics_onboarding_screen.dart:93",
+  "bug": "_seedFromProfile seeds birth years outside the wheel's 1940+ selectable range (profiles allow 1900+), so the controller clamps and the first interaction silently corrupts a pre-1940 saved birth year to a boundary value.",
+  "class": "legacy-data-outside-widget-range",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/auth/screens/demographics_onboarding_screen.dart:440",
+  "bug": "didUpdateWidget calls jumpToItem during the parent rebuild, synchronously firing onSelectedItemChanged which calls setState during build (debug assert) and falsely latches _birthYearTouched without user interaction.",
+  "class": "framework-lifecycle-reentrancy",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/api/src/db/migrations/0108_payout_setup_seed.sql:190",
+  "bug": "SECURITY DEFINER complete_mission queries unqualified user_payment_method/user_address without SET search_path, so a caller who can create temp tables can shadow them and forge rows that pass the EXISTS guard to collect the reward.",
+  "class": "security-definer-search-path",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 783,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/api/src/db/migrations/0108_payout_setup_seed.sql:136",
+  "bug": "The backfill treats any non-NULL birth_year as a complete profile while complete_mission requires many more fields, so partial-profile users are both denied the task and stripped of existing active copies, leaving them permanently unable to complete the demographics mission.",
+  "class": "predicate-mismatch-between-paths",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 788,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/workflows/feature-tests.yml:176",
+  "bug": "The check-runs query uses per_page=100 without paginating, so a SHA with over 100 check runs can hide the bot runs past page one, hitting the appear-deadline and failing open so tests run despite bot findings.",
+  "class": "pagination-truncation",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 788,
+  "bots": [
+   "cursor"
+  ],
+  "file": ".maestro/auth/login.yaml:114",
+  "bug": "The optional notVisible 'I Accept' wait uses a 30s timeout, and in the common back-to-back terms+privacy case the button never leaves the tree, so every dual-document login burns the full 30 seconds.",
+  "class": "test-wait-inefficiency",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": true
+ },
+ {
+  "pr": 789,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/admin/components/missions/mission-form.tsx:366",
+  "bug": "The admin form lets reviewRequired be enabled on system activation missions, which makes mobile call submitMissionForReview instead of complete_mission, bypassing the payout/demographics guards and preventing intended completion.",
+  "class": "config-invariant-unenforced",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 789,
+  "bots": [
+   "cursor"
+  ],
+  "file": ".maestro/auth/login.yaml:9",
+  "bug": "AUTH_ANCHORS now includes 'I Accept', so the legal-accept repeat loop's wait on AUTH_ANCHORS is satisfied by the very dialog it just tapped, making the loop retap forever and hang shared login.yaml callers post-migration.",
+  "class": "self-satisfying-wait-condition",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 789,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/admin/components/missions/mission-form.tsx:376",
+  "bug": "Saving an activation mission forces assignmentMode 'all' and re-inserts user_mission rows for every user lacking one, resurrecting demographics assignments migration 0108 deliberately deleted and letting completed users earn the coin award again; companyId is also not pinned to null.",
+  "class": "reassignment-undoes-migration",
+  "seed_covered": true,
+  "seed": "9. Write path \u2014 scoped? transaction? idempotent under retry?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 789,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/api/src/db/migrations/0108_payout_setup_seed.sql:266",
+  "bug": "The payout_setup guard is weaker than client validation: paypal_email LIKE '%_@_%' accepts junk, and user_address is not checked for country_code, so owner-writable placeholder rows via PostgREST still collect the mission reward.",
+  "class": "weak-server-validation",
+  "seed_covered": true,
+  "seed": "10. External input reaching sink \u2014 validated at this boundary?",
+  "resolved": false,
+  "noise": false
+ },
+ {
+  "pr": 789,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "AGENT_RUNBOOK.md:545",
+  "bug": "The documented gh api reviews command filters only by bot login, not by the PR head SHA or last-review-per-bot, so stale findings from already-fixed commits get re-triaged or a verdict is declared from a review that never saw the current commit.",
+  "class": "query-missing-filter",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 789,
+  "bots": [
+   "cursor"
+  ],
+  "file": ".github/workflows/feature-tests.yml:185",
+  "bug": "bot-gate treats any check conclusion == neutral as review findings, but Bugbot also reports neutral for cancelled runs and internal errors, so a Bugbot outage red-defers every ready PR instead of failing open as designed.",
+  "class": "status-value-conflation",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 789,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/workflows/feature-tests.yml:188",
+  "bug": "Under set -euo pipefail a transient gh api error aborts bot-gate before any decide-true fail-open branch runs, so ci-gate sees a failed upstream job and blocks, contradicting the promised fail-open behavior on API errors.",
+  "class": "unhandled-error-bypasses-failsafe",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 789,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "AGENT_RUNBOOK.md:551",
+  "bug": "Line 551 requires waiting for both bots' verdicts while line 552 defines Macroscope SKIPPED as having no verdict yet says to proceed, a contradiction that makes an obedient agent re-poll forever on the documented skip path.",
+  "class": "spec-contradiction",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 789,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/workflows/feature-tests.yml:226",
+  "bug": "After seeing a neutral Bugbot conclusion the gate sleeps a fixed 15 seconds and treats one empty comment snapshot as conclusive, so review comments landing later are missed and the gate fails open despite real findings.",
+  "class": "polling-race-fixed-sleep",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": false,
+  "noise": false
+ },
+ {
+  "pr": 790,
+  "bots": [
+   "cursor",
+   "macroscopeapp"
+  ],
+  "file": "AGENT_RUNBOOK.md:546",
+  "bug": "gh api --paginate applies the --jq group_by/map(last) reduction per page, so last-review-per-bot is computed within each page and stale reviews from earlier pages can be consumed.",
+  "class": "pagination-partial-aggregation",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 790,
+  "bots": [
+   "cursor"
+  ],
+  "file": ".github/workflows/feature-tests.yml:214",
+  "bug": "Corroboration filter matches review comments on commit_id, but GitHub rewrites commit_id to the new head after a synchronize (only original_commit_id stays tied to the posting SHA), so stale migrated comments still match and cause false deferrals.",
+  "class": "stale-identifier-semantics",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 793,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/admin/app/actions/uploads.ts:230",
+  "bug": "parseInt silently accepts partially numeric config strings like '10coins' or '10.5' that the SQL INTEGER cast in the sibling functions would reject, so JS and SQL consumers of the same config diverge.",
+  "class": "lenient-parse-divergence",
+  "seed_covered": true,
+  "seed": "10. External input reaching sink \u2014 validated at this boundary?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 793,
+  "bots": [
+   "cursor",
+   "macroscopeapp"
+  ],
+  "file": "apps/api/src/db/migrations/0110_raise_email_share_points_to_10.sql:16",
+  "bug": "The ON CONFLICT DO UPDATE sets config_value and updated but not is_active, so an existing deactivated email_share_points row becomes 10 yet stays inactive and readers requiring is_active=true skip it.",
+  "class": "upsert-partial-fields",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 793,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/admin/app/actions/uploads.ts:241",
+  "bug": "Admin upload approval fallback default was raised to 10 while the SQL functions grant_email_share_points and claim_emails still hardcode a fallback of 5, so credits diverge when the config row is missing or invalid.",
+  "class": "duplicated-constant-drift",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 798,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/earning/widgets/upload_timeline.dart:223",
+  "bug": "Any image load failure (timeout, offline, transient 5xx) on an approved upload is treated as proof of permanent privacy deletion, mislabeling the upload and making it non-tappable instead of retryable.",
+  "class": "error-conflation",
+  "seed_covered": true,
+  "seed": "6. catch block \u2014 swallowed / too broad / partial state",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 798,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/admin/lib/upload-sidecar.ts:114",
+  "bug": "The ingest-critical sidecar write on admin approval only console.errors on GCS failure with no retry or Sentry alert, so a transient error leaves an approved upload with no sidecar and no alert.",
+  "class": "swallowed-error-no-retry",
+  "seed_covered": true,
+  "seed": "6. catch block \u2014 swallowed / too broad / partial state",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 802,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/earning/widgets/enable_brands_content.dart:363",
+  "bug": "brandOptIn event reads offeredBrandIds from live widget.companies after the await while optedInIds was snapshotted before it, so a parent refresh during the async opt-in pairs a stale numerator with a fresh denominator.",
+  "class": "stale-closure-across-await",
+  "seed_covered": true,
+  "seed": "4. await/async boundary \u2014 state captured before still valid after; future awaited at all",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 802,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/shared/services/analytics/activation_funnel.dart:97",
+  "bug": "Awaiting the network-backed country lookup before handing the event to the buffered sink means logout/background/kill during the lookup silently drops the analytics event, defeating the never-block guarantee of the buffered sink.",
+  "class": "async-durability-loss",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 802,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/admin/lib/analytics/funnel.ts:14",
+  "bug": "activationRate divides by the last element of FUNNEL_STEPS, so appending payout_requested silently redefines the KPI from country-to-first-upload to country-to-payout while the label still says first upload.",
+  "class": "implicit-denominator-drift",
+  "seed_covered": true,
+  "seed": "20. Ratio/majority gate \u2014 filtered denominator, minimum absolute count",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 802,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/earning/providers/upload_flow_provider.dart:1526",
+  "bug": "Every successful submitAll emits both first_upload and upload even at upload_index 1, and the admin funnel counts distinct users with no index filter, so Repeat upload mirrors First upload and never shows true repeat behavior.",
+  "class": "metric-definition-mismatch",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 802,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/earning/widgets/missions/detected_companies_section.dart:369",
+  "bug": "Only the bulk opt-in-all path emits the brand_opt_in funnel event; the per-chip single opt-in path never emits, so one-at-a-time users vanish from the funnel step and per-brand opt-in rates.",
+  "class": "sibling-path-omission",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 802,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/earning/widgets/missions/detected_companies_section.dart:355",
+  "bug": "brandOptIn is emitted only after Future.wait-based optInAllCompanies fully succeeds, so a single failing brand aborts the emit even though other brands already activated, silently dropping analytics for the partial success.",
+  "class": "partial-failure-state",
+  "seed_covered": true,
+  "seed": "6. catch block \u2014 swallowed / too broad / partial state",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 802,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/admin/lib/analytics/product-analytics-sql.ts:75",
+  "bug": "Filtering the upload step to upload_index >= 2 makes Repeat upload a side branch, but biggestDropOff still treats consecutive bars as a strict funnel, so First-to-Repeat is often falsely flagged as the largest leak.",
+  "class": "non-monotonic-funnel-assumption",
+  "seed_covered": true,
+  "seed": "20. Ratio/majority gate \u2014 filtered denominator, minimum absolute count",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 804,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/api/src/db/migrations/0112_payout_integrity_lockdown.sql:197",
+  "bug": "Column-scoped INSERT/UPDATE grants on shared_email still include eligibility-driving columns (gcs_upload_status, company_id) that the point-granting functions trust as proof of upload, so any authenticated user can forge upload state and repeatedly mint points.",
+  "class": "authz-gap",
+  "seed_covered": true,
+  "seed": "11. Authorization handler \u2014 real check, server-derived identity?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 804,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/api/src/app/api/email/grant-points/route.ts:74",
+  "bug": "verifyPendingUploads issues one GCS fileExists call per matching row inside an unbounded Promise.all, so many completed-but-unverified rows trigger a burst that can exhaust memory, connections, or GCS quota.",
+  "class": "unbounded-concurrency",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 804,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/api/src/app/api/email/grant-points/route.ts:37",
+  "bug": "A GCS failure during verifyPendingUploads rejects the whole handler before grant_email_share_points runs, so already-verified unawarded rows that need no further object check are also denied crediting.",
+  "class": "failure-coupling",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": false,
+  "noise": false
+ },
+ {
+  "pr": 806,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/api/src/db/migrations/0114_rpc_caller_identity_guards.sql:667",
+  "bug": "process_referral trusts a NULL JWT identity and the migration never revokes default PUBLIC EXECUTE, so an anonymous PostgREST caller can invoke the SECURITY DEFINER RPC with an arbitrary referred user id and mint referral rewards.",
+  "class": "authz-gap",
+  "seed_covered": true,
+  "seed": "11. Authorization handler \u2014 real check, server-derived identity?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 806,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/api/src/db/migrations/0114_rpc_caller_identity_guards.sql:721",
+  "bug": "The strict JWT guard on evaluate_trigger_rules rejects the admin approval process's owner connection (NULL JWT), so upload_approved mission assignments fail silently with Unauthorized.",
+  "class": "authz-overrestriction",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 807,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/earning/providers/upload_flow_provider.dart:1516",
+  "bug": "The 'upload' funnel event is only emitted inside a fire-and-forget .then chained after an async SharedPreferences write, so backgrounding/killing the app right after a successful upload silently drops the analytics event.",
+  "class": "fire-and-forget-durability",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 807,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/home/providers/app_open_sync_provider.dart:143",
+  "bug": "brandsFound funnel event is emitted even when scan.aborted is true, reporting a partial newIds.length as a completed brands_found_count.",
+  "class": "aborted-state-guard-missing",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 807,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/earning/widgets/upload_timeline.dart:217",
+  "bug": "_UploadImagePreviewState caches _failureStatusCode across widget updates and children have no keys, so a reused State treats a fresh upload as a processed/removed 404 image.",
+  "class": "stale-widget-state-reuse",
+  "seed_covered": true,
+  "seed": "13. Cache/memo write \u2014 invalidation, cross-tenant leak",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 807,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/rewards/screens/reward_payout_screen.dart:120",
+  "bug": "ref.read(activationFunnelProvider) is called after awaiting createRedemption; if the widget was disposed during the await it throws, the catch swallows it, and the payoutRequested event is silently lost on a successful cash-out.",
+  "class": "use-after-dispose-across-await",
+  "seed_covered": true,
+  "seed": "4. await/async boundary \u2014 state captured before still valid after",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 807,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/admin/app/actions/uploads.ts:236",
+  "bug": "getRewardAmount validates with /^\\d+$/ then uses Number(raw), so a config value beyond Number.MAX_SAFE_INTEGER becomes Infinity or loses precision instead of being range-checked like the SQL ::INTEGER cast, breaking finalPoints and the pointsLedger insert.",
+  "class": "numeric-overflow-range-check",
+  "seed_covered": true,
+  "seed": "12. Money/quantity arithmetic \u2014 int/float, rounding, negative",
+  "resolved": true,
+  "noise": true
+ },
+ {
+  "pr": 807,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/api/src/app/api/image-proxy/route.ts:58",
+  "bug": "Adding activity-proofs/ to the image-proxy allowlist (in both api and admin proxies) makes every user's task-proof image publicly downloadable with no authentication check.",
+  "class": "authz-gap",
+  "seed_covered": true,
+  "seed": "11. Authorization handler \u2014 real check, server-derived identity?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 807,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/app_config/providers/app_config_providers.dart:127",
+  "bug": "Consumers use '.value ?? 5' on a FutureProvider whose default changed to 10; .value is null during loading and after errors, so the stale 5 fallback still takes effect and contradicts the new default.",
+  "class": "duplicated-default-drift",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 807,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/api/src/db/migrations/0113_email_gcs_verified_gate.sql:101",
+  "bug": "The shared reward default was raised to 10 in admin approval, but grant_email_share_points and claim_emails SQL bodies still use COALESCE(..., 5), so email credits award 5 while uploads award 10 when the config row is missing/inactive.",
+  "class": "duplicated-default-drift",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 807,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/auth/providers/auth_provider.dart:53",
+  "bug": "Disposing a newer container's betterAuthServiceProvider unconditionally resets the process-global ImageProxyAuth.tokenReader to null, stripping the bearer header from a still-alive older container's authenticated image requests.",
+  "class": "global-singleton-lifecycle-clobber",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 807,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/earning/widgets/missions/detected_companies_section.dart:356",
+  "bug": "_handleOptInAll sends every ID in the frozen _stableDetected list, so a brand opted in individually during the 4-second _recentOptIns window is reported to brandOptIn a second time, overcounting confirmed opt-ins.",
+  "class": "concurrent-op-double-count",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 807,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/earning/widgets/missions/detected_companies_section.dart:365",
+  "bug": "_handleOptInAll omits brands in _processingIds assuming their per-chip request will report them, but if that chip request later fails after bulk opt-in succeeded, those brands never appear in any brand_ids payload, undercounting opt-ins.",
+  "class": "concurrent-op-undercount",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 807,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/admin/middleware.ts:8",
+  "bug": "Admin /api/image-proxy is newly cookie-gated but still returns Cache-Control: public, max-age=3600, immutable, so a shared cache can replay authenticated proof images to anonymous requesters.",
+  "class": "cache-auth-leak",
+  "seed_covered": true,
+  "seed": "13. Cache/memo write \u2014 invalidation, cross-tenant leak",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 808,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/shared/utils/image_proxy_auth.dart:26",
+  "bug": "ImageProxyAuth.headersFor treats any URL whose string startsWith the API base as first-party, so a crafted host like api.example.com.evil receives the session Authorization bearer token from five image-rendering call sites.",
+  "class": "origin-check-prefix-bypass",
+  "seed_covered": true,
+  "seed": "10. External input reaching sink \u2014 validated at this boundary?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 808,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/api/src/app/api/image-proxy/route.ts:104",
+  "bug": "Bearer-authenticated activity-proofs/ responses are served with Cache-Control: public, max-age=86400, immutable, letting a shared CDN cache serve them to later anonymous requesters without re-running verifyAuthToken.",
+  "class": "cache-auth-leak",
+  "seed_covered": true,
+  "seed": "13. Cache/memo write \u2014 invalidation, cross-tenant leak",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 808,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/api/src/app/api/image-proxy/route.ts:72",
+  "bug": "The activity-proofs/ gate only checks for any valid session and passes the caller-controlled filePath straight to the bucket, so any logged-in user can fetch another user's proof image by path (IDOR, no ownership check).",
+  "class": "authz-idor",
+  "seed_covered": true,
+  "seed": "11. Authorization handler \u2014 real check, server-derived identity?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 808,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/earning/widgets/missions/detected_companies_section.dart:365",
+  "bug": "_handleOptInAll excludes _recentOptIns but not _processingIds, so a brand with a per-chip opt-in still in flight is reported by both the bulk brandOptIn call and the chip request, inflating the funnel count.",
+  "class": "concurrent-op-double-count",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 808,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/auth/providers/auth_provider.dart:42",
+  "bug": "The provider unconditionally overwrites the process-global ImageProxyAuth.tokenReader with a closure over the newest BetterAuthService, so with coexisting ProviderContainers an older container's widgets send the newer session's bearer token.",
+  "class": "global-singleton-lifecycle-clobber",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 808,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/api/src/app/api/image-proxy/route.ts:87",
+  "bug": "The new ownership gate matches the requested path against file_url/gcs_file_path columns that remain client-writable via the Neon Data API, so a user can point their own row at another user's proof path and pass the check.",
+  "class": "authz-trusts-client-writable-data",
+  "seed_covered": true,
+  "seed": "11. Authorization handler \u2014 real check, server-derived identity?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 808,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/api/src/app/api/image-proxy/route.ts:96",
+  "bug": "The ownership check accepts a matching id in either the upload or activation_proof table, and authenticated users can INSERT an upload row with a chosen UUID, so knowing another user's activation_proof id grants access to that proof image.",
+  "class": "authz-cross-table-id-collision",
+  "seed_covered": true,
+  "seed": "11. Authorization handler \u2014 real check, server-derived identity?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 813,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "scripts/install-hooks.sh:15",
+  "bug": "git rev-parse --path-format=absolute requires Git 2.31+, so under set -e the hook installer aborts entirely on older Git versions and the pre-commit hook is never installed.",
+  "class": "tool-version-compat",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 813,
+  "bots": [
+   "macroscopeapp",
+   "cursor"
+  ],
+  "file": ".gitleaks.toml:35",
+  "bug": "An allowlist block sets both paths and regexes without condition = \"AND\"; Gitleaks defaults to OR, so every finding in docs/SECURITY_AUDIT.md is suppressed and the placeholder regexes suppress matching secrets repo-wide.",
+  "class": "config-condition-semantics",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 813,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".gitleaks.toml:10",
+  "bug": "targetRules keys in [[allowlists]] blocks are not recognized by the pinned Gitleaks v8.18.0 pre-commit hook (introduced in v8.25.0), so the config is rejected or the rule-scoped allowlists are silently ignored.",
+  "class": "config-schema-version-mismatch",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 818,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/home/widgets/home_state_views.dart:132",
+  "bug": "_CashOutProgressCard rounds the double points balance before comparing to the cheapest reward cost, so 99.6 points rounds to 100 and the card shows cash-out-ready copy even though redemption is not possible.",
+  "class": "rounding-before-compare",
+  "seed_covered": true,
+  "seed": "12. Money/quantity arithmetic \u2014 int/float, rounding, negative",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 818,
+  "bots": [
+   "macroscopeapp",
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/home/widgets/home_state_views.dart:261",
+  "bug": "Home's Earn-more teaser ranks and displays raw mission pointsReward without applying the user's tierMultiplier, while the Tasks page applies it, so users above 1x see a lower advertised payout (and different brand ordering) than the mission actually awards.",
+  "class": "duplicated-logic-divergence",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 818,
+  "bots": [
+   "macroscopeapp",
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/earning/widgets/missions/missions_state_views.dart:258",
+  "bug": "Resolved-empty gating only checks !isLoading and treats a null .value as empty, so provider error states fall back to empty lists and a transient API failure renders the all-caught-up / all-clear empty state instead of an error UI.",
+  "class": "error-state-conflated-with-empty",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 818,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/earning/widgets/missions/missions_state_views.dart:225",
+  "bug": "allResolved gates on userMultiStepMissionsProvider.hasValue but activeSignups is read from the separately-resolving activeMultiStepMissionsProvider, so for one build the all-caught-up state flashes despite an active sign-up mission existing.",
+  "class": "derived-async-state-desync",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 818,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/earning/widgets/missions/missions_state_views.dart:315",
+  "bug": "During the four-second _recentOptIns transition, detectedCandidates derived from the provider becomes empty while DetectedCompaniesSection still shows its frozen CTA, so the all-caught-up empty state renders simultaneously with the CTA.",
+  "class": "derived-async-state-desync",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 818,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/earning/widgets/missions/detected_companies_section.dart:66",
+  "bug": "detectedCompaniesSectionVisibleProvider is never reset to false in dispose, so after unmounting while visible other widgets read a stale true on the next route's first frame and render the wrong state.",
+  "class": "missing-cleanup-on-dispose",
+  "seed_covered": true,
+  "seed": "5. Resource acquisition \u2014 release on every exit path",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 819,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/auth/providers/auth_provider.dart:786",
+  "bug": "Removing a single connected email account never calls PendingSuspectedEmailStorage.clearForAccount, leaving raw email content from the disconnected account persisted in SharedPreferences until full logout.",
+  "class": "resource-cleanup-on-exit-path",
+  "seed_covered": true,
+  "seed": "5. Resource acquisition \u2014 release on every exit path",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 819,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/home/providers/app_open_sync_provider.dart:272",
+  "bug": "runAppOpenSync drives the uploading/complete celebration states without checking scan.hasAuthErrors/hasFailedAccounts/aborted, so upload success UI replaces a previously-set scan failure state and a failed inbox is shown as all caught up.",
+  "class": "error-state-masking",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 819,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/email_sync/services/pending_suspected_email_storage.dart:78",
+  "bug": "enqueue dedupes on messageIdHash across the whole queue instead of per connected inbox, so a message present in two Gmail accounts is only queued/uploaded under the first inbox's connectedEmail.",
+  "class": "dedupe-key-missing-scope",
+  "seed_covered": true,
+  "seed": "13. Cache/memo write \u2014 invalidation, cross-tenant leak",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 819,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/earning/services/company_detection_service.dart:474",
+  "bug": "enqueueAndUploadPending runs only when the IMAP fetch succeeds, so after a fetch failure the durable pending queue is not drained/retried until some later successful fetch, stalling Phase 2 uploads.",
+  "class": "recovery-gated-on-success",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 819,
+  "bots": [
+   "macroscopeapp",
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/home/providers/app_open_sync_provider.dart:291",
+  "bug": "The deferred failure-banner callback (2s, later widened to 7s, re-arming on idle) writes failureState without verifying this scan is still the latest owner, so an older run's stale failure banner can overwrite a newer sync's state or clean result.",
+  "class": "stale-callback-race",
+  "seed_covered": true,
+  "seed": "4. await/async boundary \u2014 state captured before still valid after",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 819,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/earning/services/company_detection_service.dart:213",
+  "bug": "hasAllMailCheckpoint treats any non-INBOX folder checkpoint (e.g. Sent, Drafts) as an All Mail checkpoint, so the 90-day backfill window is skipped and archived mail older than lastSyncAt is permanently missed when only some other folder has state.",
+  "class": "predicate-too-broad",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 819,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/home/providers/app_open_sync_provider.dart:286",
+  "bug": "The deferred failure-banner condition guards hasAuthErrors || hasFailedAccounts but omits scanIncomplete, so an aborted mid-fetch scan that still earns upload points is presented as a fully successful sync.",
+  "class": "incomplete-condition",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 819,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/email_sync/services/imap_client_service.dart:237",
+  "bug": "Moving the first-folder 90-day widen into the IMAP layer leaves callers passing isFullScan:false, so the widened All Mail window runs Phase 2 with full BODY[] fetches instead of envelope-only full-scan mode, causing a heavy body-fetch storm.",
+  "class": "flag-propagation-mismatch",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 819,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/home/providers/app_open_sync_provider.dart:307",
+  "bug": "The scanIncomplete banner is deferred 2s and auto-dismisses after 4s while the 5s celebration dialog is still covering it, leaving roughly one second of visibility, so an aborted scan effectively disappears behind a successful credit celebration.",
+  "class": "ui-timing-overlap",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 819,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/earning/services/company_detection_service.dart:392",
+  "bug": "The historical delta re-scan saves the knownCompanyIds snapshot whenever historical.isSuccess is true even if the fetch was aborted mid-walk, so subsequent scans see no delta and the missed mail is never retried, permanently losing detections.",
+  "class": "checkpoint-past-unprocessed",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 819,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/email_sync/services/imap_client_service.dart:311",
+  "bug": "allUnmatchedEnvelopes is capped at 500 entries but every skipped message's UID still advances highestUid and the checkpoint, so unmatched messages beyond the cap in an All Mail scan are silently and permanently lost to Phase 2 matching.",
+  "class": "checkpoint-past-unprocessed",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 819,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/earning/services/company_detection_service.dart:394",
+  "bug": "The new !aborted guard on the delta re-scan blocks email ingestion as well as the snapshot update, so emails already found in the partial pass are discarded and anyAborted is never set, delaying detection and letting the UI show a clean close.",
+  "class": "overbroad-guard-discards-partial-results",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 831,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/scripts/dora-policy.js:148",
+  "bug": "The validator issues one serial GitHub API request per Caused-by trailer with no dedup or bound, so a PR body with thousands of SHA lines exhausts the token rate limit or workflow timeout and blocks the CI gate.",
+  "class": "unbounded-input-dos",
+  "seed_covered": true,
+  "seed": "10. External input reaching sink \u2014 validated at this boundary?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 831,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/ISSUE_TEMPLATE/agent-task.md:34",
+  "bug": "The triage guidance tells authors to use 'question'/'TBD' when intent is unclear, but the Triage status field only permits four other values, so following the instruction produces metadata the DORA validator rejects.",
+  "class": "doc-enum-mismatch",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 831,
+  "bots": [
+   "cursor"
+  ],
+  "file": ".github/scripts/dora-policy.js:2",
+  "bug": "PLACEHOLDER_RE omits 'not applicable', the PR template's default for Observed behavior/Impact/Confirmation, and substantive() counts its 14 letters as real evidence, so suspected/confirmed bug PRs pass the gate with untouched template defaults.",
+  "class": "validation-sentinel-bypass",
+  "seed_covered": true,
+  "seed": "10. External input reaching sink \u2014 validated at this boundary?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 831,
+  "bots": [
+   "cursor"
+  ],
+  "file": ".github/workflows/feature-tests.yml:37",
+  "bug": "Adding the 'edited' trigger under the existing cancel-in-progress concurrency group means a PR title/body edit cancels in-flight bot-gate polling and mobile test shards and restarts the full expensive suite for a metadata-only change.",
+  "class": "ci-trigger-churn",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": true
+ },
+ {
+  "pr": 831,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "AGENT_RUNBOOK.md:395",
+  "bug": "The documented append recipe computes BASE but never sets the BASE_TREE env var the jq expression reads (assignment only exists in a comment), so appending to an existing _agent-assets branch commits a tree with no base_tree and silently deletes all previously uploaded assets.",
+  "class": "unused-variable-wrong-env",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 832,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/ISSUE_TEMPLATE/agent-task.md:23",
+  "bug": "The instructions tell authors to use 'question'/'TBD' for triage status when intent is unclear, but the field's allowed set is only not-applicable/suspected-bug/confirmed-bug/change-request, so following the guidance yields invalid metadata.",
+  "class": "doc-enum-mismatch",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": false,
+  "noise": false
+ },
+ {
+  "pr": 832,
+  "bots": [
+   "cursor"
+  ],
+  "file": ".github/scripts/dora-policy.js:27",
+  "bug": "PLACEHOLDER_RE does not treat 'not applicable' as empty and it satisfies substantive(), so classification 'none' can pass the policy with Reason left as the template default instead of a real explanation.",
+  "class": "validation-sentinel-bypass",
+  "seed_covered": true,
+  "seed": "10. External input reaching sink \u2014 validated at this boundary?",
+  "resolved": false,
+  "noise": false
+ },
+ {
+  "pr": 832,
+  "bots": [
+   "cursor"
+  ],
+  "file": ".github/workflows/feature-tests.yml:37",
+  "bug": "The 'edited' event retriggers the whole feature-tests suite on title/body changes and cancel-in-progress cancels in-flight analyze-mobile, bot-gate, and test shards before restarting them even though no code changed.",
+  "class": "ci-trigger-churn",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": false,
+  "noise": true
+ },
+ {
+  "pr": 835,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "AGENT_RUNBOOK.md:201",
+  "bug": "The recovery instruction says to run .agent/scripts/seed-agent-user.sh, but the runbook's commands assume working dir apps/mobile/, from which the relative path resolves to a nonexistent file, so the recovery command fails exactly when needed after the nightly wipe.",
+  "class": "doc-path-error",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 835,
+  "bots": [
+   "cursor"
+  ],
+  "file": ".agent/scripts/seed-agent-user.sh:42",
+  "bug": "resolve_cred strips every single/double quote from AGENT_TEST_PASSWORD via tr -d rather than only wrapping quotes, silently altering passwords containing quotes before hashing so the seeded credential never matches .env.dev and Maestro login stays broken.",
+  "class": "overbroad-sanitization",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 835,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/api/src/db/seed-agent-user.ts:67",
+  "bug": "The seeder does SELECT-then-INSERT without ON CONFLICT, so two concurrent invocations can both observe no row and both insert, making one fail with a unique-email-constraint violation (same race on the credential-account insert), breaking the idempotency guarantee.",
+  "class": "race-toctou",
+  "seed_covered": true,
+  "seed": "9. Write path \u2014 scoped? transaction? idempotent under retry?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 835,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/api/src/db/seed-agent-user.ts:157",
+  "bug": "Company missions are only assigned on the user_company_detection transition to opted_in and the repair path has no mirror backfill, so a repaired user who is already opted in never regains missing company missions after a re-seed.",
+  "class": "idempotent-repair-gap",
+  "seed_covered": true,
+  "seed": "9. Write path \u2014 scoped? transaction? idempotent under retry?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 835,
+  "bots": [
+   "macroscopeapp",
+   "cursor"
+  ],
+  "file": "apps/api/src/db/seed-agent-user.ts:174",
+  "bug": "The company-mission backfill's NOT EXISTS guard excludes only active/pending_review/completed/approved and omits dismissed (and other terminal statuses), so with no unique constraint a re-seed inserts a second active user_mission row and resurrects a dismissed mission.",
+  "class": "enum-exclusion-incomplete",
+  "seed_covered": true,
+  "seed": "9. Write path \u2014 scoped? transaction? idempotent under retry?",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 837,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".agent/scripts/neon-temp-branch.sh:139",
+  "bug": "Default-branch lookup reads only the first page of the Neon branches API, so once branch count grows the default branch falls off page one and every create call fails with 'no default branch found'.",
+  "class": "pagination-truncation",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 837,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/workflows/dev-auth-scrub.yml:22",
+  "bug": "Scrub workflow runs on a fixed cron 90 minutes after the nightly restore starts, so a slow or delayed restore copies prod session/JWKS rows after the DELETEs run and they survive the scrub.",
+  "class": "cross-process-schedule-race",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 837,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "AGENT_RUNBOOK.md:397",
+  "bug": "Documented append recipe never assigns BASE_TREE so jq's $ENV.BASE_TREE is always empty and each new commit replaces (instead of appends to) all prior screenshots on the assets branch.",
+  "class": "unset-env-var",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 837,
+  "bots": [
+   "cursor"
+  ],
+  "file": ".github/workflows/feature-preview.yml:136",
+  "bug": "Preview branches fork dev carrying prod-secret-encrypted JWKS rows, and the JWKS sync step exits successfully when dev has no keys, leaving undecryptable prod keys in place so /api/auth/token fails on previews.",
+  "class": "silent-noop-success / cross-env-secret-propagation",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 837,
+  "bots": [
+   "cursor"
+  ],
+  "file": ".github/workflows/feature-tests.yml:37",
+  "bug": "Adding 'edited' to the PR trigger re-runs the whole workflow on any description change, and cancel-in-progress concurrency then aborts in-flight test shards for a metadata-only edit.",
+  "class": "ci-trigger-cancellation",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": true
+ },
+ {
+  "pr": 837,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/workflows/dev-auth-scrub.yml:81",
+  "bug": "Post-scrub freshness check passes if any jwks row has a createdAt in the last 10 minutes (even a restored prod key), and the curl retry loop falls through without failing when all retries are exhausted, producing a false-green scrub.",
+  "class": "weak-verification-oracle",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 852,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/home/screens/root_home_screen.dart:1470",
+  "bug": "Home pull-to-refresh only kicks appOpenSyncProvider which honors the new 15-minute recency guard, so an explicit refresh can skip the IMAP scan and cannot recover a scanFailed state the way Tasks refresh does.",
+  "class": "stale-cache-not-invalidated",
+  "seed_covered": true,
+  "seed": "13. Cache/memo write \u2014 invalidation, cross-tenant leak",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 852,
+  "bots": [
+   "cursor",
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/home/providers/app_open_sync_provider.dart:163",
+  "bug": "appOpenSyncForceScanProvider is read/cleared only after the scanInProgressProvider early return, so a pull-to-refresh during an active scan leaves the force flag set and the next ordinary remount triggers an unguarded extra inbox scan.",
+  "class": "flag-not-consumed-on-early-return",
+  "seed_covered": true,
+  "seed": "5. Resource acquisition \u2014 release on every exit path",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 856,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/workflows/feature-tests.yml:239",
+  "bug": "A migration filename containing a space is split into two arguments by xargs, so schema-contract.js gets nonexistent paths, silently skips them, and the real migration is never validated.",
+  "class": "shell-word-splitting",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 856,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/scripts/schema-contract.js:727",
+  "bug": "runCheck silently filters out migration paths that fail existsSync, so a misconfigured checkout yields 'Checked 0 migration(s)' and success instead of failing, letting breaking migrations bypass the gate.",
+  "class": "fail-open-silent-skip",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 856,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/scripts/schema-contract.js:564",
+  "bug": "parseMigration suppresses any DROP whose unqualified name matches a later CREATE in the same file without comparing shapes, so a rebuild that drops contracted columns or changes a function signature emits no breaking change.",
+  "class": "name-only-match (shallow identity comparison)",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 856,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/workflows/feature-tests.yml:227",
+  "bug": "'|| true' at the end of the migration-discovery pipeline swallows gh api failures (not just grep no-match), leaving migrations.txt empty so the contract check is skipped and ci-gate passes a breaking migration.",
+  "class": "error-suppression-fail-open",
+  "seed_covered": true,
+  "seed": "6. catch block \u2014 swallowed / too broad / partial state",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 856,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/scripts/schema-contract.js:622",
+  "bug": "raisesVersionFloor returns true if the SQL merely mentions minimum_version/minimum_build_number anywhere (even in string literals) and never verifies the floor was actually raised, so contract violations get waived without a real floor bump.",
+  "class": "weak-pattern-match (keyword presence as proof)",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 856,
+  "bots": [
+   "cursor"
+  ],
+  "file": ".github/scripts/schema-contract.js:418",
+  "bug": "Contract extractor only detects fields passed explicitly to jsonEncode, so write bodies going through postWithRetry/patchWithRetry (which encode internally) are missed and drops/SET NOT NULL on those fields bypass the check.",
+  "class": "incomplete-static-extraction (missed call pattern)",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 856,
+  "bots": [
+   "cursor"
+  ],
+  "file": ".github/scripts/schema-contract.js:408",
+  "bug": "When a single-table buildUri call has no select and bracket/jsonEncode harvesting finds nothing, the extractor never falls through to selectsAll, leaving tables with empty columns and no guard at all.",
+  "class": "missing-default-fallback (fail-open on empty harvest)",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 856,
+  "bots": [
+   "cursor"
+  ],
+  "file": ".github/scripts/schema-contract.js:649",
+  "bug": "The generator records RPC args but checkMigrations only tests function-name existence, so combined with same-name DROP suppression, argument renames and signature rebuilds never produce a violation.",
+  "class": "recorded-but-never-checked",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 856,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/scripts/schema-contract.js:662",
+  "bug": "maskSqlNoise does not honor backslash escapes inside E'...' literals, so the scanner closes the string early, misclassifies trailing text, and can blank a following breaking statement from the masked SQL.",
+  "class": "lexer-escape-handling",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 856,
+  "bots": [
+   "cursor"
+  ],
+  "file": ".github/scripts/test-schema-contract.js:318",
+  "bug": "The new test claims to lock in that E must be its own token before a quote but its SQL never puts E before a quote, so the [\\w$] guard in maskSqlNoise can regress without failing CI.",
+  "class": "ineffective-test (assertion does not exercise claimed behavior)",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 858,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/app_version/widgets/version_floor_watcher.dart:73",
+  "bug": "Resume-time ref.invalidate of an autoDispose provider while splash is awaiting the provider's earlier .future can leave that future hanging forever, and _blockedByVersionFloor has no timeout, stranding the user on the splash logo.",
+  "class": "invalidated-inflight-future-hang",
+  "seed_covered": true,
+  "seed": "4. await/async boundary \u2014 state captured before still valid after; future awaited at all",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 858,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/auth/screens/splash_screen.dart:256",
+  "bug": "_goGated calls context.go then immediately shows the soft-update dialog from the splash context, racing go_router's route replacement so the dialog can be dropped as the splash route is removed.",
+  "class": "ui-navigation-race",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 858,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/app_version/widgets/version_floor_watcher.dart:64",
+  "bug": "VersionFloorWatcher rechecks on every resume without an auth guard even though check_app_version requires a user id, so signed-out sessions throw on each resume and pollute Crashlytics with expected pre-auth failures.",
+  "class": "missing-precondition-guard (telemetry pollution)",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": true
+ },
+ {
+  "pr": 858,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/auth/screens/splash_screen.dart:231",
+  "bug": "ShareReceiveService.consumePendingIfReady() runs before _goGated's version check, so when a force update blocks navigation the pending share-sheet images have already been destructively consumed and are lost after the user updates.",
+  "class": "destructive-consume-before-commit",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 858,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/auth/screens/splash_screen.dart:303",
+  "bug": "The catch path in _blockedByVersionFloor calls ref.read(errorRecorderProvider) without a mounted check, so a version check completing after splash disposal throws on the disposed ref instead of failing open.",
+  "class": "use-after-dispose (post-await ref access)",
+  "seed_covered": true,
+  "seed": "4. await/async boundary \u2014 state captured before still valid after; future awaited at all",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 858,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/auth/screens/splash_screen.dart:235",
+  "bug": "The share path awaits _blockedByVersionFloor with a timeout, consumes the share, then _goGated awaits the same underlying future again; a timeout fail-open on the first await does not complete the shared future, so the second await can still force-block after the share buffer was cleared, dropping it permanently (and a hung check pays the 5s ceiling twice).",
+  "class": "timeout-scope-mismatch (per-await timeout on shared memoized future)",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 858,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/app_version/widgets/version_floor_watcher.dart:103",
+  "bug": "The auth guard runs only before the await, so if the user signs out while the version re-check is in flight, a requireForceUpdate result still shows a non-dismissible UpdateDialog over the signed-out UI.",
+  "class": "stale-state-after-await",
+  "seed_covered": true,
+  "seed": "4. await/async boundary \u2014 state captured before still valid after; future awaited at all",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 858,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/app_version/widgets/version_floor_watcher.dart:74",
+  "bug": "DateTime.now().difference(last) goes negative when the device clock moves backward, which is always less than minimumInterval, so every resume check is skipped until wall-clock time catches back up to the old timestamp.",
+  "class": "non-monotonic-clock",
+  "seed_covered": true,
+  "seed": "19. Date/time \u2014 timezone, DST, s vs ms, clock source",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 858,
+  "bots": [
+   "cursor"
+  ],
+  "file": "apps/mobile/lib/features/app_version/widgets/version_floor_watcher.dart:108",
+  "bug": "The new post-await auth re-check calls ref.read(authStateProvider) before any mounted guard and outside the try/catch, so a watcher disposed mid-flight throws the same disposed-ref error this PR was fixing elsewhere.",
+  "class": "use-after-dispose (post-await ref access)",
+  "seed_covered": true,
+  "seed": "4. await/async boundary \u2014 state captured before still valid after; future awaited at all",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 861,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/scripts/schema-contract.js:284",
+  "bug": "parseLogicalFilter keeps only the first dot-segment of each predicate, so embedded-resource filters like or=(actors.first_name.eq.X) record 'actors' as a base-table column and the real related columns are left out of the contract.",
+  "class": "parser-syntax-gap (dot-path truncation)",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 861,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/scripts/schema-contract.js:479",
+  "bug": "A select value containing Dart string interpolation like 'id,${extraColumn}' yields no parsed columns, no unresolved entry, and no selectsAll, so whatever the interpolated select reads is silently unguarded by the contract.",
+  "class": "silent-unresolved (dynamic value not flagged)",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 861,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/scripts/schema-contract.js:253",
+  "bug": "parseSelect does not strip PostgREST spread syntax, so '...directors(last_name)' yields relation name '...directors' which fails COLUMN_RE and is silently dropped from the contract with no diagnostic.",
+  "class": "parser-syntax-gap (unhandled token silently dropped)",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 861,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": "apps/mobile/lib/features/onboarding/widgets/onboarding_balance_pill.dart:99",
+  "bug": "With balanceUnknown=true, coins==0 and alwaysVisible=false, the pill is hidden entirely instead of showing the '--' placeholder because _hasShown is only latched when coins > 0.",
+  "class": "state-combination-gap (unknown branch not forced visible)",
+  "seed_covered": true,
+  "seed": "17. Feature flag/conditional \u2014 other branch still works",
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 861,
+  "bots": [
+   "macroscopeapp"
+  ],
+  "file": ".github/scripts/schema-contract.js:277",
+  "bug": "parseOrder splits on '.' and takes the first segment, so embedded-resource ordering like directors(last_name).desc yields a name that fails COLUMN_RE and is silently dropped, leaving directors.last_name unguarded.",
+  "class": "parser-syntax-gap (embedded-order not parsed)",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ },
+ {
+  "pr": 861,
+  "bots": [
+   "cursor"
+  ],
+  "file": ".agent/scripts/seed-agent-user.sh:86",
+  "bug": "seed-agent-user.sh targets Neon's default branch while the mobile dev environment uses a different branch, so it either seeds the wrong database or refuses to seed the right one, and the agent test user is never available for Maestro login.",
+  "class": "environment-target-mismatch",
+  "seed_covered": false,
+  "seed": null,
+  "resolved": true,
+  "noise": false
+ }
+]
