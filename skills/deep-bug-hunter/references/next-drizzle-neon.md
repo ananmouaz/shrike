@@ -60,6 +60,18 @@ Apply as seeds, then trace and falsify. A pattern match is a question, not a fin
 - Schema/migration mismatch: a column added in the schema file with no migration, or a
   non-nullable column added without a default against a populated table.
 
+## Postgres functions / RPC (Supabase-style)
+
+- **`SECURITY DEFINER` without `SET search_path`.** Unqualified table references inside
+  the function can be shadowed by caller-created temp tables — privilege escalation.
+  Check every definer function in the diff for an explicit `SET search_path`.
+- **Definer RPC callable by any authenticated user** with no caller-identity check
+  inside the function body. The GRANT is the exposure; the check must be internal
+  (`auth.uid()` compared against the row owner), not assumed from the client.
+- **Guard tightened to require a JWT** breaking legitimate NULL-JWT callers — owner
+  connections, service-role jobs, admin approval flows. Enumerate the non-user callers
+  before clearing a new auth guard.
+
 ## Neon / serverless Postgres
 
 - Connection created per request without pooling, or a pooled client held across

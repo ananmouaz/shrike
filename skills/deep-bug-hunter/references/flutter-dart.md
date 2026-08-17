@@ -41,6 +41,18 @@ a *question*, not a finding.
   a closed Bloc/sink; `context.read` vs `context.watch` misuse causing a missed rebuild
   (only a bug if it produces observably wrong UI state — otherwise out of scope).
 - State mutated in place where the framework compares by identity, so no rebuild fires.
+- **`AsyncValue.value ?? default`** — `.value` is null both while loading and after an
+  error, so the default silently substitutes for real data in both states. Check what
+  the default does downstream (a stale reward amount, a wrong threshold).
+- **Derived state gated on one provider, read from another.** Gating on
+  `providerA.hasValue` then reading `providerB` assumes they resolve together; they
+  don't. The read can see loading/stale data the gate never checked.
+- **`didUpdateWidget` (or `build`) synchronously driving a controller** —
+  `jumpToItem`/`animateTo` firing an `onChanged` that calls `setState` during the
+  parent's rebuild is reentrancy: debug assert, or silently dropped frame state.
+- **Provider/container dispose resetting a process-global.** A `ref.onDispose` that
+  nulls a static/global (token reader, service locator entry) clobbers whatever a
+  newer container already installed there.
 
 ## Data and persistence
 
