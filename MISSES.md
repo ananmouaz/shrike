@@ -3,7 +3,40 @@
 Regression list of real bugs Shrike failed to find on live runs, plus corpus studies
 of competing reviewers' findings. Each entry records the miss, why the skill missed
 it, the category, and the patch that covers the category. Development artifact — not
-shipped in the flat build (only `skills/deep-bug-hunter/references/*.md` is inlined).
+shipped in the flat build (only `skills/shrike/references/*.md` is inlined).
+
+## How a miss becomes a patch (read this before adding an entry)
+
+The failure mode of a ledger like this is accretion: every bug another tool finds gets
+appended as a new rule, the taxonomy grows without bound, and eventually the agent
+skims a checklist instead of working a method. A 200-row seed list is worse than a
+20-row one even though it "covers more".
+
+So the rule is **generalize or don't add**:
+
+1. Classify the miss into one of the eight invariant classes in
+   `references/seeds-and-slicing.md`. Most misses are an existing class the run failed
+   to *ask*, not a class that doesn't exist — that is a discipline problem, fixed in
+   the workflow or the falsification pass, not by adding a rule.
+2. If the class exists but has no shape resembling this bug, add one clause to that
+   class's *shapes* list. Shapes are evidence; they cost one clause and no new
+   question.
+3. A genuinely new class must be a *kind* of wrongness, not a situation. "The value
+   doesn't mean what the consumer thinks" is a kind. "This linter's allowlist fields
+   default to OR" is a situation — it goes in a stack reference, or nowhere.
+4. Stack- or library-specific instances go to `references/<stack>.md`.
+5. The specific case itself belongs in `study/` as corpus, not in the method. The test
+   for anything entering the method: **would it change what a reviewer does on a diff
+   it has never seen?**
+
+The budget is stated and enforced in `references/seeds-and-slicing.md`: constructs stay
+language-level and finite, the classes stay eight, that file stays under ~2,500 words.
+Merge or delete before adding.
+
+Studies 1 and 2 below were run *before* this rule existed and did accrete rows — 47 by
+the end. The restructure that introduced the eight classes folded all 47 back down
+while getting slightly smaller in total words. That is the shape every future study
+should take.
 
 ## 2026-08-17 — corpus study 2: karajan, dashboard, platform (45 PRs, Cursor-only)
 
@@ -79,7 +112,7 @@ Studied every PR (#782–#861) where both Cursor BugBot and Macroscope posted fi
 findings were NOT covered by Shrike's then-current seed taxonomy — the taxonomy was
 strong on value-level defects (null, bounds, async, authz) and weak on
 *system-level* ones. Dominant uncovered clusters, each patched as a new seed in
-`references/seeds-and-slicing.md` (mirrored in `adapters/bug-hunt.prompt.md`):
+`references/seeds-and-slicing.md` (mirrored in `adapters/shrike.prompt.md`):
 
 1. **Fail-open validator/checker code** (~15 findings) — CI gates, parsers,
    contract extractors that silently pass on error/empty/unparsed input, or whose
