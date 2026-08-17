@@ -1,3 +1,10 @@
 .DS_Store
 *.skill
 node_modules/
+
+# Corpus and ledger material derived from private repositories.
+# Findings studied from other reviewers stay local — only generalized failure
+# shapes belong in this repo. See MISSES.md, "How a miss becomes a patch".
+study/
+*-corpus-*.json
+MISSES.original.md
