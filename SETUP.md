@@ -5,7 +5,8 @@ wrong.
 
 1. **`shrike`** — one repo, created once. The skill lives here. It contains no
    application code and reviews nothing by itself.
-2. **Project repos** — Rewado, JobPilot, WhereYahiaEats. These *consume* the skill.
+2. **Project repos** — the application repos you actually want reviewed. These
+   *consume* the skill.
    They get a symlink or a prompt file, optionally a workflow, and their own
    `review-rules.md`.
 
@@ -24,7 +25,7 @@ cd shrike
 
 git init
 git add .
-git commit -m "deep-bug-hunter v0.1"
+git commit -m "shrike v0.1"
 
 gh repo create shrike --private --source=. --push
 ```
@@ -37,7 +38,7 @@ Verify it built:
 ./scripts/build_portable.sh
 ```
 
-Should print a word count and write `dist/bug-hunt.flat.md`.
+Should print a word count and write `dist/shrike.flat.md`.
 
 ---
 
@@ -60,17 +61,17 @@ Claude Code: skip the clone entirely —
 
 ```
 /plugin marketplace add ananmouaz/shrike
-/plugin install deep-bug-hunter@shrike
+/plugin install shrike@shrike
 ```
 
 Or wire it manually with a symlink (works for any skill-loading agent, and gives you
 a local checkout to hack on):
 
 ```bash
-cd ~/dev/rewado
+cd ~/dev/your-project
 # path shown for Claude Code; adjust for your agent's skills dir
 mkdir -p .claude/skills
-ln -s ~/dev/shrike/skills/deep-bug-hunter .claude/skills/deep-bug-hunter
+ln -s ~/dev/shrike/skills/shrike .claude/skills/shrike
 echo ".claude/skills/" >> .gitignore
 ```
 
@@ -83,23 +84,23 @@ Test it in your agent:
 > hunt for bugs in the diff against main
 ```
 
-If it doesn't trigger on its own, say `use the deep-bug-hunter skill` explicitly. A
+If it doesn't trigger on its own, say `use the shrike skill` explicitly. A
 skill that won't auto-trigger usually means the `description` in the frontmatter needs
 to name the phrasing you actually use.
 
 ### Portable-prompt path — any other agent
 
 ```bash
-cd ~/dev/rewado
+cd ~/dev/your-project
 mkdir -p .agents
-cp ~/dev/shrike/adapters/bug-hunt.prompt.md .agents/
+cp ~/dev/shrike/adapters/shrike.prompt.md .agents/
 cat ~/dev/shrike/adapters/AGENTS.md >> AGENTS.md
 ```
 
 Codex reads `AGENTS.md` automatically. Cursor: copy the same prompt to
-`.cursor/rules/bug-hunt.mdc` and set it to agent-requested rather than always-on.
+`.cursor/rules/shrike.mdc` and set it to agent-requested rather than always-on.
 Gemini CLI: append the pointer to `GEMINI.md` instead. Raw API: send
-`dist/bug-hunt.flat.md` as the system prompt.
+`dist/shrike.flat.md` as the system prompt.
 
 ### Seed the rules file
 
@@ -116,25 +117,26 @@ commit it. Three real invariants beat twenty copied ones.
 
 ```bash
 mkdir -p .github/workflows
-cp ~/dev/shrike/templates/workflows/bug-hunt.yml .github/workflows/
+cp ~/dev/shrike/templates/workflows/shrike.yml .github/workflows/
 ```
 
 The shipped workflow uses Claude Code as the CI runtime; to run another agent, swap
-the run step for that agent's CLI and feed it `dist/bug-hunt.flat.md`.
+the run step for that agent's CLI and feed it `dist/shrike.flat.md`.
 
 Then edit three things in that file:
 
 1. **The clone URL** in the "Fetch skill" step — point at your actual skills repo.
-2. **The dependency steps** — delete the Flutter block in JobPilot, delete the Node
-   block in Rewado. Leaving both in doubles CI time for nothing.
+2. **The dependency steps** — keep only the toolchain the repo actually uses; delete
+   the Flutter block in a JS-only repo and the Node block in a Dart-only one. Leaving
+   both in doubles CI time for nothing.
 3. **The trigger** — for the first few weeks, delete the `pull_request:` block and
-   keep only `issue_comment:`. You then run it by commenting `/bughunt` on a PR. This
+   keep only `issue_comment:`. You then run it by commenting `/shrike-review` on a PR. This
    caps your spend while you're still measuring whether the output is any good.
 
 Add secrets:
 
 ```bash
-gh secret set ANTHROPIC_API_KEY --repo ananmouaz/rewado
+gh secret set ANTHROPIC_API_KEY --repo <owner>/<your-project>
 ```
 
 If `shrike` is private, `GITHUB_TOKEN` cannot reach it from another repo. Create
@@ -170,7 +172,7 @@ week one is how the tool gets deleted in week two.
 
 ```bash
 cd ~/dev/shrike
-# edit skills/deep-bug-hunter/...
+# edit skills/shrike/...
 ./scripts/build_portable.sh          # keep the flat build in sync
 git commit -am "tighten falsification pass" && git push
 ```

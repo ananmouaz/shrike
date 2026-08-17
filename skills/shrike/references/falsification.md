@@ -73,3 +73,9 @@ Ask these about the report as a whole:
 - Is any finding really a preference wearing a bug costume?
 - If exactly one of these is wrong, which one is it? That one probably is. Re-examine
   it, and delete it unless you can close it.
+- For every "checked and cleared" entry: was it cleared in the context the code
+  actually runs in — the state earlier pipeline stages leave behind, the real caller
+  set, the real data distribution — or only in isolation? "The math is internally
+  consistent" clears nothing if the inputs it was judged against never occur at
+  runtime. Isolation-only clearances are where misses hide; re-check them in context
+  before listing them.

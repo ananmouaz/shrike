@@ -1,30 +1,30 @@
-name: Deep Bug Hunt
+name: Shrike
 
-# Runs the deep-bug-hunter skill on pull requests, replacing BugBot/CodeRabbit.
+# Runs the shrike skill on pull requests, replacing BugBot/CodeRabbit.
 # Quiet by design: posts one comment, and only when there is something to say.
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-  # Manual re-run: comment "/bughunt" on a PR
+  # Manual re-run: comment "/shrike-review" on a PR
   issue_comment:
     types: [created]
 
 # Don't burn tokens re-reviewing a branch that's still being pushed to.
 concurrency:
-  group: bughunt-${{ github.event.pull_request.number || github.event.issue.number }}
+  group: shrike-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: true
 
 jobs:
   hunt:
-    # Skip drafts, skip bot PRs, and for comments only fire on /bughunt
+    # Skip drafts, skip bot PRs, and for comments only fire on /shrike-review
     if: |
       (github.event_name == 'pull_request' &&
        github.event.pull_request.draft == false &&
        github.event.pull_request.user.type != 'Bot') ||
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request != null &&
-       contains(github.event.comment.body, '/bughunt'))
+       contains(github.event.comment.body, '/shrike-review'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -64,15 +64,15 @@ jobs:
         run: |
           mkdir -p .claude/skills
           git clone --depth 1 https://github.com/${{ github.repository_owner }}/shrike.git /tmp/skills
-          cp -r /tmp/skills/skills/deep-bug-hunter .claude/skills/
-          chmod +x .claude/skills/deep-bug-hunter/scripts/*.sh
+          cp -r /tmp/skills/skills/shrike .claude/skills/
+          chmod +x .claude/skills/shrike/scripts/*.sh
 
-      - name: Run deep bug hunt
+      - name: Run Shrike bug hunt
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
-            Use the deep-bug-hunter skill in .claude/skills/deep-bug-hunter to review
+            Use the shrike skill in .claude/skills/shrike to review
             this pull request. Read SKILL.md first and follow all six phases in order,
             including the falsification pass. Do not skip Phase 4.
 
@@ -85,10 +85,20 @@ jobs:
             The full repository is checked out — use it. The highest-value work is
             finding callers of changed symbols outside the diff.
 
-            When finished, post the report as ONE pull request comment using the gh
-            CLI. Do not post inline review comments — one comment keeps the signal
-            concentrated. If nothing survives the evidence bar, post the short
-            zero-findings report with the "Checked and cleared" list. Do not pad it.
+            Phase 0 must stamp the start time (date +%s > /tmp/shrike-start) so the
+            report header carries a measured duration. In Phase 6 run
+            .claude/skills/shrike/scripts/report_stats.sh for the header numbers.
+
+            When finished, write the report to /tmp/shrike-report.md, print it, and
+            post it as ONE pull request comment:
+
+              .claude/skills/shrike/scripts/post_report.sh ${{ github.event.pull_request.number || github.event.issue.number }} /tmp/shrike-report.md
+
+            That script upserts by a hidden marker, so a re-run on a new push replaces
+            the previous report instead of stacking copies. Do not post inline review
+            comments — one comment keeps the signal concentrated. If nothing survives
+            the evidence bar, post the short zero-findings report with the run header
+            and the "Checked and cleared" list. Do not pad it.
           claude_args: |
             --allowedTools "Bash,Read,Glob,Grep,Edit,Write"
             --max-turns 60

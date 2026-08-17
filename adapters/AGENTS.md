@@ -14,7 +14,7 @@ burn context on every unrelated task.
 When asked to review a PR, review a diff, check a branch before merge, find bugs,
 check for regressions, or answer "did I break anything" / "is this safe to merge":
 
-**Read `.agents/bug-hunt.prompt.md` and follow it exactly.** Do not improvise a code
+**Read `.agents/shrike.prompt.md` and follow it exactly.** Do not improvise a code
 review instead. Do not skip Phase 4 (falsification) — it is the phase that makes the
 output worth reading.
 
