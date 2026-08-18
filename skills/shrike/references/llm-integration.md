@@ -25,6 +25,20 @@ match is a question, not a finding.
   persistence layer writes against what the provider requires on replay.
 - Tool-call arguments assumed to be valid JSON of the declared schema without a
   parse/validate step — a model can emit a malformed or extra-field payload.
+- **Model output shape-checked but not value-checked.** The parse succeeded, so the
+  field is *present* — but nothing verifies it is a member of the enum, an array of
+  the expected length, or a finite number. A hallucinated channel, a three-element
+  bounding box, or a `NaN` coordinate then flows on as a valid record. Check the
+  narrowing between "parsed" and "used": truthiness on a container (`{}`, `[]`, an
+  object whose every field is null) is not validation.
+- **A missing optional defaulted to the value that passes the filter.** An absent
+  `confidence` coalesced to `1.0` means the low-quality drop never fires; the safe
+  default for a model-supplied quality signal is the one that *excludes*.
+- **Two entry points into the same model feature that validate differently** — a
+  full-document route and a region/retry route, a primary and a repair call. Whatever
+  the first path nulls, clamps, dedupes, or rejects, diff against the second.
+- Raw model text echoed back in an error response or logged verbatim, carrying
+  document content into places the document itself was never allowed to reach.
 - Streaming: partial content committed to durable state before the stream
   completes, with no reconciliation when it aborts mid-way.
 - **Framework error contract assumed rather than read.** Rethrowing from a repair

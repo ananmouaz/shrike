@@ -152,3 +152,85 @@ correctness defect and stays in scope.
 hardcoded media types on multimodal parts, reasoning blocks persisted without the
 metadata replay requires, cancellation signals not threaded into nested calls,
 framework error contracts assumed rather than read, and stale pricing constants.
+
+---
+
+## Study 3 — depth pass, five codebases, four languages
+
+The two earlier studies read the most recent reviewed pull requests. This one went
+*backwards* through the history of five codebases — a Python data/orchestration
+service, two TypeScript web applications, a Flutter client with a TypeScript admin
+surface, and a browser-based capture tool — reading several hundred more findings in
+batches. The point was no longer coverage of a repo but **recurrence across repos**: a
+shape seen once is an anecdote, a shape seen in three unrelated codebases in two
+languages is a seed.
+
+Roughly two thirds landed on shapes already present. What follows is only what
+recurred *and* generalized. Each became one clause, folded into the class it belongs
+to — the taxonomy stayed at eight.
+
+1. **Comparison strength mismatched to the identity being tested** (A). Case-sensitive
+   here and case-folded there; an unanchored substring where a prefix was meant; a
+   normalization that collapses distinct keys, or fails to collapse equal ones. The
+   single most repeated shape in the corpus, in every language present.
+2. **Truthiness standing in for presence** (B). `0`, `""`, `false`, and *explicitly
+   cleared* all taking the absent branch — a cleared field silently restoring the
+   default, a zero cursor persisted as NULL, an opt-out env var read as opt-in. Its
+   database sibling: a predicate on a nullable column written `= false`, which drops
+   the NULLs. Its filter sibling: an empty query degrading to match-*everything*.
+3. **Handlers typed on exceptions the library does not raise there** (B). Timeouts
+   that are not the language's timeout type, domain errors outside the caught
+   hierarchy. Always the same consequence: work meant to be retried is recorded as
+   permanently failed. Frequently visible as two sibling workers disagreeing about
+   which errors are transient.
+4. **Positional identity** (A). An array index, a list order, or a rounded coordinate
+   used as a stable key across regeneration — cached verdicts keyed to a slot, drafts
+   keyed to an index, ids that collide when two items round to the same cell.
+5. **Async results applied without a currency check** (C, G). A response landing after
+   the session, file, or selection it was requested for has changed; two runs writing
+   one slot with no generation counter, so the slower earlier one wins; and the mirror
+   image, an early return on a staleness check that skips the cleanup the happy path
+   performs, leaving a spinner or lock set forever.
+6. **Sibling paths that drift** (E). A gate, validation, normalization, or masking step
+   applied on one route and missing from the parallel one — a region endpoint next to
+   a full-document endpoint, a table view next to a card view, a new action added
+   outside the matcher covering its neighbours. This is where the authorization
+   findings clustered; almost none were "no check at all", nearly all were "checked
+   here, not there".
+7. **Redaction that downstream code still keys on** (A, E). A field nulled or
+   substituted for one class of caller, while the code that sorts, filters, groups, or
+   deduplicates by it collapses distinct entities into one bucket, or leaks the raw
+   value on the path nobody updated.
+8. **Failure states that cannot be left** (F). A memoized promise caching its own
+   rejection; a retry counter incremented past its cap so the re-armed row can never be
+   selected again; a drain loop whose exit condition is "no more matching rows" while
+   one permanently failing row keeps matching.
+9. **Partial idempotency on rerun** (B, H). An already-ran guard that short-circuits
+   some of a second run's effects but not others; a reset or backfill that misses the
+   columns the selection predicate actually reads; an already-applied migration or
+   one-shot script edited in place, so databases stamped at it never receive the
+   change.
+10. **Defaults and constraints that live in only one layer** (E). Enforced by the ORM
+    and bypassed by raw SQL or a bulk insert; a uniqueness rule expressed over a
+    nullable column, which the database does not enforce at all.
+11. **Metrics computed over a different population than the thing they describe** (A,
+    D). A coverage or freshness figure with a different filter set than the query it
+    annotates; a cap applied before the filter that should have preceded it; a dedupe
+    that keeps one member wholesale and drops fields only the others carried.
+
+**Language support.** One of the five codebases is Python, and its failure modes were
+distinctive enough to earn `references/python-backend.md`: exception-hierarchy
+assumptions, indentation-as-control-flow, ORM defaults skipped by bulk and raw writes,
+migration-chain hazards, and fork-vs-spawn worker pools. The deterministic pass already
+ran the Python analyzers; the checklist is what was missing.
+
+**Scope, again.** The residual left deliberately unreported was almost entirely dead
+code, redundant helpers, duplicated blocks, and performance speculation — the scope
+contract now names those explicitly. One carve-out was added in the other direction: a
+change that leaves a control **unreachable or unactivatable** is a correctness defect,
+even though the labelling of that control is not.
+
+**Budget.** These additions pushed `seeds-and-slicing.md` past its stated 2,500-word
+cap. Prose was compressed and clauses merged; the stated budget moved to 3,000 with the
+same enforcement, and the preference for *widening an existing clause over appending a
+new one* is now written into the file. The classes remain eight.

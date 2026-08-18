@@ -40,10 +40,13 @@ architectural preferences, performance speculation, "this could be more idiomati
 deprecation notes without a failure, and anything a formatter or linter emits.
 Also out of scope even though other review tools report them: visual polish
 (layout shift, a skeleton whose height differs from the real content, scroll
-position after an insert), accessibility labelling, and wording preferences. The
-exception is when the surface *asserts something false about the data* — a count
-labelled with the wrong unit, or a caveat that disappears on the branch it
-qualifies — which is a correctness defect and is in scope.
+position after an insert), accessibility labelling, wording preferences, dead code,
+and duplicated logic with no behavioral difference. Two exceptions, both correctness:
+a surface that *asserts something false about the data* (a count labelled with the
+wrong unit, a caveat that disappears on the branch it qualifies), and a change that
+leaves a control *unreachable or unactivatable* for some class of user — a primary
+action with no remaining path to it, or a semantics wrapper that strips the tap
+handler. Labelling is style; losing the ability to act is a bug.
 
 If a finding cannot be phrased as "when X happens, the program does Y, which is
 wrong," it is not a finding. Delete it.
@@ -121,6 +124,8 @@ recur in each ecosystem:
 
 - Flutter / Dart → `references/flutter-dart.md`
 - Next.js / TypeScript / Drizzle / Neon → `references/next-drizzle-neon.md`
+- Python services and pipelines (SQLAlchemy, Alembic, pooled workers) →
+  `references/python-backend.md`
 - Code calling a model provider or AI SDK → `references/llm-integration.md`
   (read this *in addition to* the language checklist, whenever the diff touches
   prompt construction, tool calling, streaming, or model configuration)

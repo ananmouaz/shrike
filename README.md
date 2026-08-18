@@ -15,8 +15,10 @@ Forensic bug hunting on a diff, PR, or branch. Returns only correctness bugs bac
 by a concrete failure scenario — never style, naming, refactoring, or "consider"
 suggestions. Zero findings is a valid and common output.
 
-Built to replace BugBot / CodeRabbit / Macroscope. Tuned for Flutter/Dart and
-Next.js + TypeScript + Drizzle + Neon.
+Built to replace BugBot / CodeRabbit / Macroscope. The method is language-agnostic;
+stack checklists ship for Flutter/Dart, Next.js + TypeScript + Drizzle + Neon, Python
+services and pipelines (SQLAlchemy, Alembic, pooled workers), and code calling a model
+provider.
 
 ## The output
 

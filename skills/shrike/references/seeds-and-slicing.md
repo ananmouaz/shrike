@@ -7,13 +7,10 @@ model runs out of enthusiasm — which is exactly when it starts inventing. Seed
 search is bounded: each seed poses a *closed question* that reading code answers yes
 or no, and when the seeds are worked the pass is done.
 
-There are two layers, and they do different jobs.
-
-- **Constructs** (below) are the *grep layer*: syntax you can find mechanically. The
-  list is language-level, so it is finite and does not grow.
-- **Invariant classes** are the *reasoning layer*: the eight kinds of wrongness a
-  change can introduce. Every semantic bug is an instance of one of them. This list
-  is deliberately capped at eight — see "Keeping this bounded".
+Two layers, different jobs. **Constructs** are the grep layer: syntax found
+mechanically, language-level and finite. **Invariant classes** are the reasoning
+layer: the eight kinds of wrongness a change can introduce, capped at eight on purpose
+(see "Keeping this bounded").
 
 Work both against the diff and its blast radius. Ignore untouched code unless a
 changed contract reaches it.
@@ -31,7 +28,11 @@ Mechanical triggers. Find them, then ask the question.
 | Resource acquisition (open, subscribe, listen, connect) | Is release guaranteed on every exit, including throw and early return? |
 | `catch` block | Swallowed? Caught type too broad? Partial state left behind? |
 | Loop with a mutable accumulator or index | First iteration, last, empty input, single element. |
-| Boundary operator (`<` vs `<=`) | Inclusive or exclusive, and does that match the caller's assumption? |
+| Boundary operator (`<` vs `<=`) | Inclusive or exclusive, does that match the caller's assumption, and if it is a range, is the pair validated as ordered? |
+| Truthiness or nullish check (`if (x)`, `x ?? d`, `if x:`) | Can the value legitimately be `0`, `""`, `false`, or explicitly cleared — and does the absent branch then swallow it? |
+| `catch` / `except` on a named error type | Does the library actually raise *that* type on this path, or a sibling that escapes the handler? |
+| String comparison used as identity (equality, `in`, regex, key construction) | Same case, anchoring, normalization, and null handling on both sides of the comparison? |
+| Secret, connection string, or raw upstream response crossing a boundary (client bundle, CI output, log, error body) | Is it meant to be readable there? |
 | Write path (update, delete, upsert, file write) | Scoped? In a transaction with the reads it depends on? Idempotent under retry? |
 | External input reaching a sink (query, shell, path, HTML, redirect) | Validated at *this* boundary, or assumed validated elsewhere? |
 | Authorization-relevant handler | A real check, using server-derived identity rather than a client-supplied ID? |
@@ -57,12 +58,17 @@ denote — unit, population, encoding, state — and does every consumer agree?
 
 **Shapes:** join/pair rows counted as distinct entities; two different units summed
 into one total; rows *attempted* reported as rows *written*; a scoped or filtered
-result used as if global; money in floats; seconds vs milliseconds; a sentinel or
-cleared value meaning "unbounded" on one side and "none" on the other; reference
-equality where value equality was meant; an enum variant falling through to a default
-that means something else; a declared media type that does not match the bytes; a
-label, tooltip, or caveat asserting something the data contradicts; a schema-default
-sort key colliding with the intended order.
+result used as if global; money in floats; seconds vs milliseconds; local wall-clock
+written into a column read as UTC; a sentinel or cleared value meaning "unbounded" on
+one side and "none" on the other, or an explicit clear stored identically to
+never-set so clearing silently restores the default; reference equality where value
+equality was meant; an enum variant falling through to a default that means something
+else; a declared media type that does not match the bytes; a list position, array
+index, or rounded coordinate used as a stable identity across regeneration; an
+intentional skip returned as the same value as a completed item; a label, caveat,
+coverage figure, or freshness stamp computed over a different filter set or window
+than the result it annotates; a schema-default sort key colliding with the intended
+order.
 
 **Kill it with:** the single definition both sides share, or a test that pins the unit.
 
@@ -72,13 +78,21 @@ sort key colliding with the intended order.
 check — and which legitimate caller does the check now wrongly reject?
 
 **Shapes:** a validator that fails open on error, empty result, missing file, or
-unparsed input; an oracle that proves a proxy (name exists, keyword present, any
-recent row) rather than the property; a null reaching the use on one branch;
-authorization derived from a client-supplied identity; a resource released only on the
-happy path; a flag set on one event and cleared only on another; a busy lock covering
-the submit buttons but not the paths that unmount the form; a `continue`/skip that
-omits the bookkeeping write the main path performs; a newly tightened guard that now
-rejects service jobs, admin flows, or NULL-session callers.
+unparsed input; an oracle — or a test, eval, or verification query — whose pass
+condition proves a proxy (name exists, keyword present, any recent row) rather than
+the property it names; an empty filter that degrades to match-everything instead of
+match-nothing; a presence check written as truthiness, so `0`, `""`, `false`, or a
+deliberately cleared value takes the absent branch; a nullable column compared with
+`= false` or `!= x`, silently dropping NULL rows; a `catch`/`except` naming a type the
+library does not raise here, so the intended retry or park never runs; a null reaching
+the use on one branch; authorization derived from a client-supplied identity, or
+evaluated on the impersonated user where the real actor was meant; a resource released
+only on the happy path; a flag set on one event and cleared only on another; a busy
+lock covering the submit buttons but not the paths that unmount the form; a
+`continue`/skip that omits the bookkeeping write the main path performs; an
+already-ran guard that short-circuits some of a rerun's effects but not others; a
+newly tightened guard that now rejects service jobs, admin flows, or NULL-session
+callers.
 
 **Kill it with:** the guard on that specific path, or the type that makes the bad
 value unrepresentable.
@@ -88,12 +102,17 @@ value unrepresentable.
 **Ask:** between the moment this state was captured and the moment it is used, what
 else can change it?
 
-**Shapes:** state captured before an `await` and used after; a later pipeline pass
-judged against the original input rather than what earlier passes left behind; a gate
-on one async source while reading from another that resolves separately; a draft or
-expansion flag keyed to an identity that changed underneath it; a reset performed in
-an effect, so the first paint still shows the previous state (a leftover *armed*
-destructive confirm is the dangerous case); a process-global reset by an older
+**Shapes:** state captured before an `await` and used after; an async result applied
+without checking that the session, file, or key it was requested for is still the
+current one; a ref or cache read by a same-turn callback that only updates on the next
+render; a later pipeline pass judged against the original input rather than what
+earlier passes left behind; a gate on one async source while reading from another that
+resolves separately; a draft or expansion flag keyed to an identity that changed
+underneath it; a reset performed in an effect, so the first paint still shows the
+previous state (a leftover *armed* destructive confirm is the dangerous case); a
+terminal or in-flight marker never cleared on the early-return path, so the flow
+cannot be re-entered; a write that invalidates the query it obviously affects but not
+the sibling views computed from the same rows; a process-global reset by an older
 instance's teardown; a cache with no invalidation on logout, tenant switch, or
 permission change; a checkpoint written from a snapshot taken before an abort.
 
@@ -106,9 +125,12 @@ outside it?
 
 **Shapes:** an aggregate computed over page one of a paginated read; a per-page
 reduction where whole-set semantics were intended; a ratio whose denominator is itself
-filtered, so a handful of unrepresentative members decide the gate; a cap that drops
-the tail while a cursor advances past it anyway; a group whose members are all
-excluded producing no row at all, leaving a stale prior value reading as current.
+filtered, so a handful of unrepresentative members decide the gate; a cap applied
+*before* the filter that should have preceded it, so the eligible tail never makes the
+window; a cap that drops the tail while a cursor advances past it anyway; a dedupe or
+group-by that keeps one member wholesale and discards fields only the others carried;
+a group whose members are all excluded producing no row at all, leaving a stale prior
+value reading as current.
 
 **Kill it with:** the loop that exhausts the source, or explicit handling of the
 excluded remainder.
@@ -118,11 +140,17 @@ excluded remainder.
 **Ask:** what else in the repo encodes this same fact or rule, and did the change
 update all of them?
 
-**Shapes:** a default in the client and again in a database function; the same
-predicate in a badge and in the filter it describes; docs or a runbook naming an enum
-value the schema rejects; a new route missing from a parallel allowlist or exemption
-list; one of two sibling paths missing the side effect the other performs; a
-precedence order that disagrees between two levels of aggregation; a predicate
+**Shapes:** a default in the client and again in a database function; a default,
+constraint, or normalization enforced only in the ORM or application layer and
+bypassed by raw SQL, a bulk insert, or a migration that writes the table directly; the
+same predicate in a badge and in the filter it describes; a string key duplicating a
+schema field name, where the two disagree and the lookup silently returns its default,
+leaving the branch dead; docs or a runbook naming an enum value the schema rejects; a
+new route, action, or endpoint added outside the matcher, middleware, or capability
+gate that covers its neighbours; a validation, normalization, or masking step present
+on one path and missing from its sibling; a scheduled wake-up computed from a boundary
+the predicate it triggers evaluates strictly, so the run it schedules changes nothing;
+a precedence order that disagrees between two levels of aggregation; a predicate
 computed over merged inputs and then applied to each subset separately.
 
 **Kill it with:** a grep for the old literal or rule showing every copy changed — or
@@ -135,12 +163,18 @@ left behind?
 
 **Shapes:** returning success because a local precondition holds while the remote step
 failed; error conflated with empty, so a transient failure renders as "nothing here";
-still-loading conflated with a real default; a recovery or repair handler whose own
-I/O can throw and take the whole operation down; a fallback that re-issues work the
-primary already retried to exhaustion, unpaced and concurrent; a destructive consume
-(pop, clear, mark-done) before the dependent operation commits; a fire-and-forget
-write whose loss is invisible; one source's error gating another's error UI, so
-nothing is shown at all.
+still-loading conflated with a real default; an access or capability lookup that falls
+back to a permissive default when the lookup itself fails; a memoized promise, client,
+or cache entry that stores its own rejection, making one transient failure permanent;
+a recovery or repair handler whose own I/O can throw and take the whole operation
+down; a fallback that re-issues work the primary already retried to exhaustion,
+unpaced and concurrent; a retry counter incremented past its cap, so the re-armed row
+can never be selected again; a drain loop whose exit depends on rows leaving the
+selection, so one permanently failing item spins forever; an irreversible external
+effect (mail, webhook, payment, label) issued before the local row that records it
+commits; a destructive consume (pop, clear, mark-done) before the dependent operation
+commits; a fire-and-forget write whose loss is invisible; one source's error gating
+another's error UI, so nothing is shown at all.
 
 **Kill it with:** the branch that surfaces, retries, or compensates for it.
 
@@ -149,11 +183,16 @@ nothing is shown at all.
 **Ask:** what ordering does this depend on, and what actually guarantees it?
 
 **Shapes:** read-then-write across two statements with no transaction or atomic
-update; a fixed sleep or cron offset standing in for a signal; a dismissal handler
-committing an action while the click that dismissed it also fires; a mutation issued
-twice because only the UI guard exists; a gate false on first render and set in a
-later effect; two processes on independent schedules whose windows can overlap; a
-controller driven synchronously during a parent's rebuild.
+update; two async runs writing the same slot with no sequence or generation check, so
+the slower earlier one lands last; a `max`, `sort`, or window function over a key that
+ties in practice, the winner decided by input order; a client documented as not
+thread-safe shared across a pool; two jobs that each reconcile the same table
+destructively, so each deletes rows the other owns; a fixed sleep or cron offset
+standing in for a signal; a dismissal handler committing an action while the click
+that dismissed it also fires; a mutation issued twice because only the UI guard
+exists; a gate false on first render and set in a later effect; two processes on
+independent schedules whose windows can overlap; a controller driven synchronously
+during a parent's rebuild.
 
 **Kill it with:** the lock, transaction, idempotency key, explicit sequencing, or
 single-threaded guarantee.
@@ -163,39 +202,45 @@ single-threaded guarantee.
 **Ask:** what outside this change depends on what the change altered?
 
 **Shapes:** a changed signature, nullability, or return shape with callers left on the
-old contract; a removed or renamed field still read by persisted rows or older
+old contract; a test double or fixture still returning the old shape, so the suite
+passes vacuously; a removed or renamed field still read by persisted rows or older
 clients; a migration whose `CASCADE` reaches tables nobody enumerated, or whose window
-misses concurrently written rows; `ON CONFLICT DO UPDATE` leaving unset columns stale;
-two migration revisions sharing a parent, so `upgrade head` fails; a DDL lock held
-across a long backfill in the same transaction; a key or namespace that now collides
-with another environment, whose cleanup then deletes what it does not own; a
-navigation target that drops the scope the current view implies; a pinned tool version
-that lacks the config keys the change uses.
+misses concurrently written rows; an already-applied migration or one-shot script
+edited in place, so every database stamped at it never receives the change; `ON
+CONFLICT DO UPDATE` leaving unset columns stale, or `DO NOTHING` where the row's values
+must be refreshed; two migration revisions sharing a parent, so `upgrade head` fails; a
+DDL lock held across a long backfill in the same transaction; a reset or backfill that
+misses the columns the selection predicate actually reads, so the rows it meant to
+re-arm stay excluded; a helper whose name promises a narrower scope than what it
+deletes; a new node added to a pipeline or graph but not to the job, schedule, or
+selection that must materialize it; a key or namespace that now collides with another
+environment, whose cleanup then deletes what it does not own; a composite key whose
+missing components default to the empty string, collapsing unrelated items into one
+bucket; a navigation target that drops the scope the current view implies; a pinned
+tool version that lacks the config keys the change uses.
 
 **Kill it with:** an enumeration of the dependents, each shown handled.
 
 ## Keeping this bounded
 
-The eight classes are the whole semantic taxonomy, and they are meant to stay eight.
-When a bug turns up that this file did not catch — a real miss, or something found by
-studying another reviewer's output — the fix is almost never a new row.
+The eight classes are the whole semantic taxonomy and are meant to stay eight. When a
+bug turns up that this file did not catch, the fix is almost never a new row.
 
-1. **Express it as an instance of an existing class.** Add it to that class's *shapes*
-   list only if it names a shape genuinely absent there. Shapes are evidence and cost
-   one clause each.
-2. **If it fits no class, name the invariant it violates in one sentence before adding
-   anything.** A ninth class has to be a *kind* of wrongness, not a *situation*: "the
-   value doesn't mean what the consumer thinks" is a kind; "this linter's allowlist
-   fields default to OR" is a situation, and belongs in a stack reference or nowhere.
+1. **Express it as an instance of an existing class**, adding one clause to that
+   class's *shapes* list only if the shape is genuinely absent. Shapes are evidence.
+2. **If it fits no class, name the invariant it violates in one sentence first.** A
+   ninth class must be a *kind* of wrongness, not a *situation*: "the value doesn't
+   mean what the consumer thinks" is a kind; "this linter's allowlist fields default
+   to OR" is a situation, and belongs in a stack reference or nowhere.
 3. **Stack- and library-specific instances go in `references/<stack>.md`**, never here.
-4. **Budget:** the construct table stays language-level and finite; the classes stay
-   eight; this file stays under ~2,500 words (`wc -w`). Past that it stops being a
-   method and becomes a checklist, and a checklist gets skimmed instead of worked.
-   Merge or delete before adding.
+4. **Budget:** constructs stay language-level; classes stay eight; this file stays
+   under ~3,000 words (`wc -w`). Past that it stops being a method and becomes a
+   checklist, and a checklist gets skimmed instead of worked. Merge or delete before
+   adding — prefer widening an existing clause to appending a new one.
 
 The test for any addition: **would this line change what a reviewer does on a diff it
 has never seen?** If it only describes a bug that already happened, it is a corpus
-entry, not a seed, and it does not belong in this file.
+entry, not a seed.
 
 ## Backward slicing
 
