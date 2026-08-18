@@ -32,6 +32,8 @@ Mechanical triggers. Find them, then ask the question.
 | Truthiness or nullish check (`if (x)`, `x ?? d`, `if x:`) | Can the value legitimately be `0`, `""`, `false`, or explicitly cleared — and does the absent branch then swallow it? |
 | `catch` / `except` on a named error type | Does the library actually raise *that* type on this path, or a sibling that escapes the handler? |
 | String comparison used as identity (equality, `in`, regex, key construction) | Same case, anchoring, normalization, and null handling on both sides of the comparison? |
+| Normalizing / stripping transform (`trim`, `tr -d`, `replace`, slug) | Does it strip only the edge or wrapper it was meant to, or every occurrence anywhere in the value? |
+| Optional chain or safe-navigation followed by more access (`a?.[k].m()`, `a?.b.c`) | Does the guard cover the *whole* path, or does it short-circuit one link and then dereference anyway? |
 | Secret, connection string, or raw upstream response crossing a boundary (client bundle, CI output, log, error body) | Is it meant to be readable there? |
 | Write path (update, delete, upsert, file write) | Scoped? In a transaction with the reads it depends on? Idempotent under retry? |
 | External input reaching a sink (query, shell, path, HTML, redirect) | Validated at *this* boundary, or assumed validated elsewhere? |
@@ -74,16 +76,16 @@ different filter set than the result it annotates.
 **Ask:** enumerate every way into and out of the guarded region. Which path skips the
 check — and which legitimate caller does the check now wrongly reject?
 
-**Shapes:** a validator failing open on error, empty result, missing file, or unparsed
-input; an oracle or test whose pass condition proves a proxy (name exists, keyword
-present) rather than the property; an empty filter degrading to match-everything; a
-presence check written as truthiness (`0`, `""`, `false`, cleared) or a nullable column
-compared `= false`, so the absent branch swallows a real value; a `catch`/`except`
-naming a type the library never raises here, so the retry never runs; a null reaching
-the use on one branch; authorization from a client-supplied identity, or evaluated on
-the impersonated user; a resource released only on the happy path; a flag or busy lock
-set on one event and cleared only on another, missing the paths that unmount or abort;
-a `continue`/skip omitting the bookkeeping write the main path performs; an already-ran
+**Shapes:** a validator failing open on error, empty result, or unparsed input; an
+oracle or test proving a proxy (a name exists, a keyword is present) rather than the
+property; an empty filter degrading to match-everything; a presence check written as
+truthiness (`0`, `""`, `false`, cleared), a nullable column compared `= false`, or a
+missing value defaulted to the neutral or passing one — the absent branch swallows a
+real signal; a `catch`/`except` naming a type the library never raises here, so the
+retry never runs; authorization from a client-supplied identity, from the impersonated
+user, or enforced only by an affordance the server disagrees with; a flag or busy lock
+cleared only on one event, missing the paths that unmount or abort; a
+`continue`/skip omitting the bookkeeping write the main path performs; an already-ran
 guard short-circuiting some of a rerun's effects but not others; a tightened guard now
 rejecting service jobs, admin flows, or NULL-session callers.
 
@@ -187,18 +189,18 @@ single-threaded guarantee.
 
 **Ask:** what outside this change depends on what the change altered?
 
-**Shapes:** a changed signature, nullability, or return shape with callers on the old
-contract; a test double still on the old shape, so the suite passes vacuously; a
-removed or renamed field still read by persisted rows or older clients; a migration
+**Shapes:** a changed signature, nullability, return shape, or removed field with
+callers, persisted rows, older clients, or test doubles left on the old contract, a
+stale double passing the suite vacuously; a dependency bump whose API the call sites no
+longer match — renamed field, moved export, vanished config key; a migration
 whose `CASCADE` reaches unenumerated tables, whose window misses concurrent writes, or
-locks DDL across a backfill; an applied migration or one-shot script edited in
-place — databases stamped at it never get the change; `ON CONFLICT DO UPDATE` leaving
-unset columns stale, `DO NOTHING` where values must refresh; a reset or backfill
-missing the columns the selection predicate reads; a helper whose name promises a
-narrower scope than it deletes; a node added to a graph but not to the job that runs
-it; a key colliding with another environment's, whose cleanup deletes what it does not
-own, or with unrelated items when missing parts default to empty string; a navigation
-target dropping the scope the current view implies.
+locks DDL across a backfill; an applied migration or one-shot script edited in place —
+databases stamped at it never get it; `ON CONFLICT DO UPDATE` leaving unset columns
+stale, `DO NOTHING` where values must refresh; a reset or backfill missing the columns
+the selection predicate reads; a helper deleting more than its name promises; a node
+added to a graph but not the job that runs it; a key colliding with
+another environment's, so cleanup deletes what it does not own, or with unrelated items
+on empty-string defaults; a navigation target dropping the current view's scope.
 
 **Kill it with:** an enumeration of the dependents, each shown handled.
 

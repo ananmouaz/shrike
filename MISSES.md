@@ -232,6 +232,47 @@ contract now names those explicitly. One carve-out was added in the other direct
 change that leaves a control **unreachable or unactivatable** is a correctness defect,
 even though the labelling of that control is not.
 
+### Study 3b — the validation half
+
+Study 3 derived shapes from one set of pull requests, so a second, unread set was pulled
+immediately after — 45 more pull requests across three of the same codebases, ~205
+findings, none of them consulted while writing the patches.
+
+**The result is the point: almost everything landed on an existing clause, and a
+visible share landed on clauses written hours earlier.** Async results applied without a
+currency check, sibling caches left uninvalidated, local wall-clock written into a UTC
+column, still-loading rendered as a real default, skip paths omitting the bookkeeping
+the main path performs, guards short-circuiting part of a rerun — all previously
+residual, all now absorbed on first contact with unseen code. A taxonomy that only
+explains the corpus it was derived from is a description; one that catches the next
+batch is a method.
+
+Roughly a tenth of the sample was material the scope contract deliberately excludes —
+dead code, duplicated helpers, dark-mode styling, grammar in a badge. Correctly not
+reported is also a result.
+
+Four things survived as genuinely uncovered. Three went in as *widenings* of existing
+clauses rather than new ones, which is the behaviour the budget is supposed to produce:
+
+1. **A client affordance disagreeing with the server check it fronts** (B). The most
+   common authorization shape in the corpus by a wide margin — not "no check at all"
+   but a button shown to callers the mutation rejects, or hidden from callers it would
+   allow. Both directions are bugs; only one is a security bug.
+2. **A missing value defaulted to the neutral or passing one** (B) — parity, full
+   confidence, "no restriction" — so the case that should have been flagged reads as
+   normal. Was already in the LLM reference as a model-output shape; the sample showed
+   it is not LLM-specific.
+3. **A dependency bump whose API the call sites no longer match** (H) — a renamed
+   field, a moved export. Replaced the narrower pinned-tool-version clause.
+4. **Optional chaining that guards one link and then dereferences anyway**
+   (`a?.[k].m()`), and **normalizing transforms that strip every occurrence rather than
+   the wrapper** — both mechanical and greppable, so both went to the construct table
+   rather than a class.
+
+Net effect on size: 86 shape clauses to 85, every class still inside 12 clauses and
+~160 words. Two additions, three merges, one deletion — the null-reaching-the-use clause
+went, because the construct table already asks that question.
+
 **Budget, and what a word cap was measuring wrong.** These additions first pushed
 `seeds-and-slicing.md` from 2,229 to 2,915 words, and the reflex was to raise the stated
 cap. Measuring where the growth actually landed showed that was the wrong control: the
