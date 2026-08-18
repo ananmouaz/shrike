@@ -1,6 +1,6 @@
 {
   "name": "shrike",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Forensic high-precision bug hunting on diffs and PRs. Returns only correctness bugs backed by a concrete failure scenario — a local replacement for BugBot, CodeRabbit, and Macroscope.",
   "author": {
     "name": "Mouaz",
