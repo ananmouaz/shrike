@@ -56,19 +56,16 @@ against, not a checklist to walk.
 **Ask:** for every value this change produces or consumes, what exactly does it
 denote — unit, population, encoding, state — and does every consumer agree?
 
-**Shapes:** join/pair rows counted as distinct entities; two different units summed
-into one total; rows *attempted* reported as rows *written*; a scoped or filtered
-result used as if global; money in floats; seconds vs milliseconds; local wall-clock
-written into a column read as UTC; a sentinel or cleared value meaning "unbounded" on
-one side and "none" on the other, or an explicit clear stored identically to
-never-set so clearing silently restores the default; reference equality where value
-equality was meant; an enum variant falling through to a default that means something
-else; a declared media type that does not match the bytes; a list position, array
-index, or rounded coordinate used as a stable identity across regeneration; an
-intentional skip returned as the same value as a completed item; a label, caveat,
-coverage figure, or freshness stamp computed over a different filter set or window
-than the result it annotates; a schema-default sort key colliding with the intended
-order.
+**Shapes:** join/pair rows counted as distinct entities; two units summed into one
+total; rows *attempted* reported as rows *written*; a scoped or filtered result used
+as if global; money in floats, seconds vs milliseconds, local wall-clock in a UTC
+column; a cleared value stored identically to never-set, or a sentinel meaning
+"unbounded" on one side and "none" on the other; reference equality where value
+equality was meant; an enum variant falling through to a default meaning something
+else; a declared media type that does not match the bytes; an index, list order, or
+rounded coordinate used as identity across regeneration; an intentional skip returned
+as a completed item; a label, coverage figure, or freshness stamp computed over a
+different filter set than the result it annotates.
 
 **Kill it with:** the single definition both sides share, or a test that pins the unit.
 
@@ -77,22 +74,18 @@ order.
 **Ask:** enumerate every way into and out of the guarded region. Which path skips the
 check — and which legitimate caller does the check now wrongly reject?
 
-**Shapes:** a validator that fails open on error, empty result, missing file, or
-unparsed input; an oracle — or a test, eval, or verification query — whose pass
-condition proves a proxy (name exists, keyword present, any recent row) rather than
-the property it names; an empty filter that degrades to match-everything instead of
-match-nothing; a presence check written as truthiness, so `0`, `""`, `false`, or a
-deliberately cleared value takes the absent branch; a nullable column compared with
-`= false` or `!= x`, silently dropping NULL rows; a `catch`/`except` naming a type the
-library does not raise here, so the intended retry or park never runs; a null reaching
-the use on one branch; authorization derived from a client-supplied identity, or
-evaluated on the impersonated user where the real actor was meant; a resource released
-only on the happy path; a flag set on one event and cleared only on another; a busy
-lock covering the submit buttons but not the paths that unmount the form; a
-`continue`/skip that omits the bookkeeping write the main path performs; an
-already-ran guard that short-circuits some of a rerun's effects but not others; a
-newly tightened guard that now rejects service jobs, admin flows, or NULL-session
-callers.
+**Shapes:** a validator failing open on error, empty result, missing file, or unparsed
+input; an oracle or test whose pass condition proves a proxy (name exists, keyword
+present) rather than the property; an empty filter degrading to match-everything; a
+presence check written as truthiness (`0`, `""`, `false`, cleared) or a nullable column
+compared `= false`, so the absent branch swallows a real value; a `catch`/`except`
+naming a type the library never raises here, so the retry never runs; a null reaching
+the use on one branch; authorization from a client-supplied identity, or evaluated on
+the impersonated user; a resource released only on the happy path; a flag or busy lock
+set on one event and cleared only on another, missing the paths that unmount or abort;
+a `continue`/skip omitting the bookkeeping write the main path performs; an already-ran
+guard short-circuiting some of a rerun's effects but not others; a tightened guard now
+rejecting service jobs, admin flows, or NULL-session callers.
 
 **Kill it with:** the guard on that specific path, or the type that makes the bad
 value unrepresentable.
@@ -103,18 +96,17 @@ value unrepresentable.
 else can change it?
 
 **Shapes:** state captured before an `await` and used after; an async result applied
-without checking that the session, file, or key it was requested for is still the
-current one; a ref or cache read by a same-turn callback that only updates on the next
-render; a later pipeline pass judged against the original input rather than what
-earlier passes left behind; a gate on one async source while reading from another that
-resolves separately; a draft or expansion flag keyed to an identity that changed
-underneath it; a reset performed in an effect, so the first paint still shows the
-previous state (a leftover *armed* destructive confirm is the dangerous case); a
-terminal or in-flight marker never cleared on the early-return path, so the flow
-cannot be re-entered; a write that invalidates the query it obviously affects but not
-the sibling views computed from the same rows; a process-global reset by an older
-instance's teardown; a cache with no invalidation on logout, tenant switch, or
-permission change; a checkpoint written from a snapshot taken before an abort.
+without checking its session or key is still current; a ref read by a same-turn
+callback that only updates on the next render; a later pipeline pass judged against the
+original input, not what earlier passes left; a gate on one async source while reading
+another that resolves separately; a draft or expansion flag keyed to an identity that
+changed underneath it; a reset performed in an effect, so the first paint still shows
+the previous state (a leftover *armed* confirm is the dangerous case); a terminal or
+in-flight marker never cleared on the early-return path, so the flow cannot be
+re-entered; a write invalidating the obvious query but not
+the sibling views over the same rows; a process-global reset by an older instance's
+teardown; a cache with no invalidation on logout, tenant switch, or permission change;
+a checkpoint written from a snapshot taken before an abort.
 
 **Kill it with:** the mechanism that re-reads, re-keys, or invalidates.
 
@@ -125,12 +117,11 @@ outside it?
 
 **Shapes:** an aggregate computed over page one of a paginated read; a per-page
 reduction where whole-set semantics were intended; a ratio whose denominator is itself
-filtered, so a handful of unrepresentative members decide the gate; a cap applied
-*before* the filter that should have preceded it, so the eligible tail never makes the
-window; a cap that drops the tail while a cursor advances past it anyway; a dedupe or
-group-by that keeps one member wholesale and discards fields only the others carried;
-a group whose members are all excluded producing no row at all, leaving a stale prior
-value reading as current.
+filtered, so a few unrepresentative members decide the gate; a cap applied *before* the
+filter that should have preceded it, so the eligible tail never enters the window; a
+cap that drops the tail while a cursor advances past it anyway; a dedupe that keeps one
+member wholesale and discards fields only the others carried; a group whose members are
+all excluded producing no row at all, leaving a stale prior value reading as current.
 
 **Kill it with:** the loop that exhausts the source, or explicit handling of the
 excluded remainder.
@@ -140,18 +131,17 @@ excluded remainder.
 **Ask:** what else in the repo encodes this same fact or rule, and did the change
 update all of them?
 
-**Shapes:** a default in the client and again in a database function; a default,
-constraint, or normalization enforced only in the ORM or application layer and
-bypassed by raw SQL, a bulk insert, or a migration that writes the table directly; the
-same predicate in a badge and in the filter it describes; a string key duplicating a
-schema field name, where the two disagree and the lookup silently returns its default,
-leaving the branch dead; docs or a runbook naming an enum value the schema rejects; a
-new route, action, or endpoint added outside the matcher, middleware, or capability
-gate that covers its neighbours; a validation, normalization, or masking step present
-on one path and missing from its sibling; a scheduled wake-up computed from a boundary
-the predicate it triggers evaluates strictly, so the run it schedules changes nothing;
-a precedence order that disagrees between two levels of aggregation; a predicate
-computed over merged inputs and then applied to each subset separately.
+**Shapes:** a default in the client and again in a database function; a default or
+constraint enforced only in the application layer, bypassed by raw SQL or a bulk write;
+the same predicate in a badge and in the filter it describes; a string key duplicating
+a schema field name, where the two disagree and the lookup silently returns its
+default, leaving the branch dead; docs or a runbook naming an enum value the schema
+rejects; a new route or action added outside the matcher, middleware, or capability gate
+covering its neighbours; a validation, normalization, or masking step present on one
+path and missing from its sibling; a wake-up scheduled at a boundary the predicate it
+triggers evaluates strictly, so the run changes nothing; a precedence order that
+disagrees between two levels of aggregation; a predicate computed over merged inputs
+and then applied to each subset separately.
 
 **Kill it with:** a grep for the old literal or rule showing every copy changed — or
 showing there is only one.
@@ -163,18 +153,16 @@ left behind?
 
 **Shapes:** returning success because a local precondition holds while the remote step
 failed; error conflated with empty, so a transient failure renders as "nothing here";
-still-loading conflated with a real default; an access or capability lookup that falls
-back to a permissive default when the lookup itself fails; a memoized promise, client,
-or cache entry that stores its own rejection, making one transient failure permanent;
-a recovery or repair handler whose own I/O can throw and take the whole operation
-down; a fallback that re-issues work the primary already retried to exhaustion,
-unpaced and concurrent; a retry counter incremented past its cap, so the re-armed row
-can never be selected again; a drain loop whose exit depends on rows leaving the
-selection, so one permanently failing item spins forever; an irreversible external
-effect (mail, webhook, payment, label) issued before the local row that records it
-commits; a destructive consume (pop, clear, mark-done) before the dependent operation
-commits; a fire-and-forget write whose loss is invisible; one source's error gating
-another's error UI, so nothing is shown at all.
+still-loading conflated with a real default; an access lookup falling back to a
+permissive default when the lookup itself fails; a memoized promise or client storing
+its own rejection, making one transient failure permanent; a recovery handler whose own
+I/O can throw and take the operation down; a fallback re-issuing work the primary
+already retried to exhaustion, unpaced and concurrent; a retry counter incremented past
+its cap, so the re-armed row is never selected again; a drain loop whose exit depends
+on rows leaving the selection, so one failing item spins forever; an irreversible
+effect — mail, webhook, payment, or a destructive consume — landing before the row that
+records it commits; a fire-and-forget write whose loss is invisible; one source's error
+gating another's error UI.
 
 **Kill it with:** the branch that surfaces, retries, or compensates for it.
 
@@ -182,17 +170,15 @@ another's error UI, so nothing is shown at all.
 
 **Ask:** what ordering does this depend on, and what actually guarantees it?
 
-**Shapes:** read-then-write across two statements with no transaction or atomic
-update; two async runs writing the same slot with no sequence or generation check, so
-the slower earlier one lands last; a `max`, `sort`, or window function over a key that
-ties in practice, the winner decided by input order; a client documented as not
-thread-safe shared across a pool; two jobs that each reconcile the same table
-destructively, so each deletes rows the other owns; a fixed sleep or cron offset
-standing in for a signal; a dismissal handler committing an action while the click
-that dismissed it also fires; a mutation issued twice because only the UI guard
-exists; a gate false on first render and set in a later effect; two processes on
-independent schedules whose windows can overlap; a controller driven synchronously
-during a parent's rebuild.
+**Shapes:** read-then-write across two statements with no transaction or atomic update;
+two async runs writing the same slot with no sequence or generation check, so the slower
+earlier one lands last; a `max`, `sort`, or window function over a key that ties in
+practice, the winner decided by input order; a client documented as not thread-safe
+shared across a pool; two jobs each reconciling the same table destructively, so each
+deletes rows the other owns; a fixed sleep or cron offset standing in for a signal; a
+dismissal handler committing an action while the click that dismissed it also fires; a
+mutation issued twice because only the UI guard exists; a gate false on first render and
+set in a later effect; two processes on independent schedules whose windows can overlap.
 
 **Kill it with:** the lock, transaction, idempotency key, explicit sequencing, or
 single-threaded guarantee.
@@ -201,23 +187,18 @@ single-threaded guarantee.
 
 **Ask:** what outside this change depends on what the change altered?
 
-**Shapes:** a changed signature, nullability, or return shape with callers left on the
-old contract; a test double or fixture still returning the old shape, so the suite
-passes vacuously; a removed or renamed field still read by persisted rows or older
-clients; a migration whose `CASCADE` reaches tables nobody enumerated, or whose window
-misses concurrently written rows; an already-applied migration or one-shot script
-edited in place, so every database stamped at it never receives the change; `ON
-CONFLICT DO UPDATE` leaving unset columns stale, or `DO NOTHING` where the row's values
-must be refreshed; two migration revisions sharing a parent, so `upgrade head` fails; a
-DDL lock held across a long backfill in the same transaction; a reset or backfill that
-misses the columns the selection predicate actually reads, so the rows it meant to
-re-arm stay excluded; a helper whose name promises a narrower scope than what it
-deletes; a new node added to a pipeline or graph but not to the job, schedule, or
-selection that must materialize it; a key or namespace that now collides with another
-environment, whose cleanup then deletes what it does not own; a composite key whose
-missing components default to the empty string, collapsing unrelated items into one
-bucket; a navigation target that drops the scope the current view implies; a pinned
-tool version that lacks the config keys the change uses.
+**Shapes:** a changed signature, nullability, or return shape with callers on the old
+contract; a test double still on the old shape, so the suite passes vacuously; a
+removed or renamed field still read by persisted rows or older clients; a migration
+whose `CASCADE` reaches unenumerated tables, whose window misses concurrent writes, or
+locks DDL across a backfill; an applied migration or one-shot script edited in
+place — databases stamped at it never get the change; `ON CONFLICT DO UPDATE` leaving
+unset columns stale, `DO NOTHING` where values must refresh; a reset or backfill
+missing the columns the selection predicate reads; a helper whose name promises a
+narrower scope than it deletes; a node added to a graph but not to the job that runs
+it; a key colliding with another environment's, whose cleanup deletes what it does not
+own, or with unrelated items when missing parts default to empty string; a navigation
+target dropping the scope the current view implies.
 
 **Kill it with:** an enumeration of the dependents, each shown handled.
 
@@ -233,10 +214,13 @@ bug turns up that this file did not catch, the fix is almost never a new row.
    mean what the consumer thinks" is a kind; "this linter's allowlist fields default
    to OR" is a situation, and belongs in a stack reference or nowhere.
 3. **Stack- and library-specific instances go in `references/<stack>.md`**, never here.
-4. **Budget:** constructs stay language-level; classes stay eight; this file stays
-   under ~3,000 words (`wc -w`). Past that it stops being a method and becomes a
-   checklist, and a checklist gets skimmed instead of worked. Merge or delete before
-   adding — prefer widening an existing clause to appending a new one.
+4. **Budget, in the order that binds.** Classes stay eight. **Shapes stay at most 12
+   per class and ~160 words per class** — that is the constraint that actually matters.
+   A long shape list gets read as a checklist to walk, and a verbose shape reads like a
+   finding, which makes a superficial match feel like evidence. Keep each shape a
+   phrase, not a sentence. Constructs stay language-level. Total under ~2,750 words
+   (`wc -w`) as a backstop. Merge or delete before adding — prefer widening an existing
+   clause to appending a new one.
 
 The test for any addition: **would this line change what a reviewer does on a diff it
 has never seen?** If it only describes a bug that already happened, it is a corpus

@@ -33,9 +33,11 @@ So the rule is **generalize or don't add**:
 5. Keep the specific case out of the method entirely. The test for anything entering
    the method: **would it change what a reviewer does on a diff it has never seen?**
 
-The budget is stated and enforced in `references/seeds-and-slicing.md`: constructs stay
-language-level and finite, the classes stay eight, that file stays under ~2,500 words.
-Merge or delete before adding.
+The budget is stated and enforced in `references/seeds-and-slicing.md`, in the order
+that binds: the classes stay eight, each class carries at most 12 shapes and ~160
+words, constructs stay language-level and finite, and the file stays under ~2,750 words
+as a backstop. Merge or delete before adding — widening an existing clause beats
+appending a new one.
 
 The two studies below were run *before* this rule existed and did accrete rows — 47 by
 the end. The restructure that introduced the eight classes folded all 47 back down
@@ -230,7 +232,22 @@ contract now names those explicitly. One carve-out was added in the other direct
 change that leaves a control **unreachable or unactivatable** is a correctness defect,
 even though the labelling of that control is not.
 
-**Budget.** These additions pushed `seeds-and-slicing.md` past its stated 2,500-word
-cap. Prose was compressed and clauses merged; the stated budget moved to 3,000 with the
-same enforcement, and the preference for *widening an existing clause over appending a
-new one* is now written into the file. The classes remain eight.
+**Budget, and what a word cap was measuring wrong.** These additions first pushed
+`seeds-and-slicing.md` from 2,229 to 2,915 words, and the reflex was to raise the stated
+cap. Measuring where the growth actually landed showed that was the wrong control: the
+*questions* had not grown at all — still eight classes, still one closed question each —
+while the **shape lists** went from 65 clauses to 97, and the new clauses averaged 19
+words against the original 11.
+
+That is the real degradation vector, and it has two mechanisms. A long shape list stops
+being illustration and gets *walked* like a checklist, which costs recall on every kind
+of wrongness the list does not happen to name. And a verbose shape reads like a finding
+already written, so a superficial match to it feels like evidence — it pre-loads the
+falsification pass with something that sounds proven.
+
+So the budget is now stated in the order that binds: eight classes, then **at most 12
+shapes per class and ~160 words per class**, then a total backstop. A compression pass
+brought every class inside that (86 clauses, 2,737 words) without losing a distinct
+shape — near-duplicates were merged, verbose clauses cut back to phrases, and the
+narrowest tooling-specific shapes pushed into stack references. A total-word cap alone
+would have hidden which class was bloating; a per-class cap cannot.
