@@ -83,8 +83,9 @@ truthiness (`0`, `""`, `false`, cleared), a nullable column compared `= false`, 
 missing value defaulted to the neutral or passing one — the absent branch swallows a
 real signal; a `catch`/`except` naming a type the library never raises here, so the
 retry never runs; authorization from a client-supplied identity, from the impersonated
-user, or enforced only by an affordance the server disagrees with; a flag or busy lock
-cleared only on one event, missing the paths that unmount or abort; a
+user, or enforced only by an affordance the server disagrees with, on permission or on
+limits; a flag or lock cleared on one event only, missing the paths that unmount or
+abort; a
 `continue`/skip omitting the bookkeeping write the main path performs; an already-ran
 guard short-circuiting some of a rerun's effects but not others; a tightened guard now
 rejecting service jobs, admin flows, or NULL-session callers.
@@ -122,8 +123,10 @@ reduction where whole-set semantics were intended; a ratio whose denominator is 
 filtered, so a few unrepresentative members decide the gate; a cap applied *before* the
 filter that should have preceded it, so the eligible tail never enters the window; a
 cap that drops the tail while a cursor advances past it anyway; a dedupe that keeps one
-member wholesale and discards fields only the others carried; a group whose members are
-all excluded producing no row at all, leaving a stale prior value reading as current.
+member wholesale and discards fields only the others carried; the wrong cardinality —
+one row assumed where the key permits several, every match written where the first was
+meant, `every` used where `any` was; a group whose members are all excluded producing no
+row at all, leaving a stale prior value reading as current.
 
 **Kill it with:** the loop that exhausts the source, or explicit handling of the
 excluded remainder.
@@ -135,15 +138,16 @@ update all of them?
 
 **Shapes:** a default in the client and again in a database function; a default or
 constraint enforced only in the application layer, bypassed by raw SQL or a bulk write;
-the same predicate in a badge and in the filter it describes; a string key duplicating
-a schema field name, where the two disagree and the lookup silently returns its
-default, leaving the branch dead; docs or a runbook naming an enum value the schema
-rejects; a new route or action added outside the matcher, middleware, or capability gate
-covering its neighbours; a validation, normalization, or masking step present on one
-path and missing from its sibling; a wake-up scheduled at a boundary the predicate it
-triggers evaluates strictly, so the run changes nothing; a precedence order that
-disagrees between two levels of aggregation; a predicate computed over merged inputs
-and then applied to each subset separately.
+the same predicate in a badge and in the filter it describes; a string that must match
+something defined elsewhere — a schema field name, a cache key another layer generates,
+a selector — where the mismatch is silent: a default returned, a no-op invalidation, a
+dead branch; docs, a runbook, or the change's own description asserting behaviour the
+code does not implement; a new route or action added outside the matcher, middleware, or
+gate covering its neighbours; a validation, normalization, or masking step present on
+one path and missing from its sibling; a wake-up scheduled at a boundary the predicate
+it triggers evaluates strictly, so the run changes nothing; a precedence order
+disagreeing between two levels of aggregation; a predicate computed over merged inputs
+then applied to each subset separately.
 
 **Kill it with:** a grep for the old literal or rule showing every copy changed — or
 showing there is only one.

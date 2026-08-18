@@ -273,6 +273,43 @@ Net effect on size: 86 shape clauses to 85, every class still inside 12 clauses 
 ~160 words. Two additions, three merges, one deletion — the null-reaching-the-use clause
 went, because the construct table already asks that question.
 
+### Study 3c — second validation round
+
+Another 45 unread pull requests, same three codebases, deeper into their histories.
+Coverage was higher still: the run kept landing on clauses *verbatim*. A guard tightened
+until it rejected NULL-session admin callers. A recovery step whose own I/O threw and
+took the operation down. Two sibling paths where only one emitted the side effect. `ON
+CONFLICT DO UPDATE` leaving a column stale. A page-at-a-time reduction where whole-set
+semantics were meant — that one arrived as a shell command whose filter ran per page.
+
+Two shapes worth having, both cross-repo:
+
+1. **A string that must match something defined elsewhere, where the mismatch is
+   silent** (E). One codebase migrated its data layer, and every hand-written cache key
+   that used to match the old generated format now matched nothing — no error, just a
+   permanently cold cache and invalidations that were no-ops. The same shape had already
+   shown up as test selectors pointing at renamed classes. It merged with the existing
+   schema-field-name clause, since both are one string having to agree with another
+   layer's, failing quietly when it doesn't.
+2. **The wrong cardinality** (D). A scalar subquery on a key that permits several rows;
+   an update that filled *every* empty slot where the first was meant; a summary that
+   showed all-clear unless *every* item lacked its safety record. One-vs-many and
+   every-vs-any are the same mistake about set size, so they are one clause.
+
+Also widened: an affordance can disagree with the server on *limits*, not just
+permission — a client that lets a reviewer select more items than the mutation accepts
+is the same defect as one that shows a button the mutation rejects. And a change's own
+description now counts alongside docs and runbooks as a place a claim can contradict the
+code; one pull request described an admin carve-out the diff did not contain.
+
+**Declined, and worth recording as declined:** a newly gated response still served with
+public cache headers. Real, dangerous, and it appeared exactly once, in one repo. The
+rule is that one occurrence is an anecdote. It stays out until a second sighting.
+
+One incidental result: an earlier compression pass moved a Flutter-specific clause out of
+the classes, and this sample turned up that exact bug — a controller driven synchronously
+during a parent's rebuild. The stack reference had it, word for word. The move was right.
+
 **Budget, and what a word cap was measuring wrong.** These additions first pushed
 `seeds-and-slicing.md` from 2,229 to 2,915 words, and the reflex was to raise the stated
 cap. Measuring where the growth actually landed showed that was the wrong control: the
