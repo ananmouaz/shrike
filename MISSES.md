@@ -329,3 +329,95 @@ brought every class inside that (86 clauses, 2,737 words) without losing a disti
 shape — near-duplicates were merged, verbose clauses cut back to phrases, and the
 narrowest tooling-specific shapes pushed into stack references. A total-word cap alone
 would have hidden which class was bloating; a per-class cap cannot.
+
+---
+
+## Study 4 — head-to-head against a commercial bot on live pull requests
+
+The first sample where Shrike and a commercial reviewer ran on the *same* pull requests
+rather than on a historical corpus: nineteen pull requests over three days on one
+repository, Shrike run by hand, the bot running on every push. The bot posted fourteen
+findings across eight of those pull requests; eleven pull requests drew nothing from it.
+
+The interesting number is not fourteen. It is how the fourteen partition once you check
+which commit each one landed against, and whether Shrike had reported on that commit:
+
+| Cause | Findings |
+|---|---|
+| No Shrike report on the pull request at all | 8 |
+| Code pushed *after* the commit Shrike reported on | 3 |
+| **Same commit, genuine miss** | **3** |
+
+**So the headline result is a coverage result, not a recall result.** Eleven of fourteen
+were bugs in code Shrike never read: pull requests where nobody ran it, one integration
+branch nobody thought to review as its own diff, and — twice — a report posted minutes
+before the next push, whose new commits contained exactly the flagged lines. A reviewer
+invoked once, early, by a human who then keeps working loses to a bot triggered by the
+push event, and it loses without being out-reasoned. Every mechanism here was a process
+gap, and none of them was visible in the report, because a run header naming a commit
+range reads as "the branch" to whoever skims it.
+
+**The three real misses, and what they have in common.** Both files were already open in
+front of the hunt; each miss was one question short of a finding.
+
+1. A continuous-integration workflow gained a `ref` input so it could smoke an arbitrary
+   branch, and its failure path still filed an incident, paged, and labelled as though
+   the default branch had broken — so verifying a fix pre-merge raised a false alert.
+   Shrike reported zero findings on that diff and had raised, then killed, a candidate on
+   the *same expression* (whether the new default was byte-identical on a scheduled run).
+   It had also declared four of the eight classes `n/a` — including B, on a file whose
+   whole subject is conditional alerting.
+2. A test-harness helper was changed, *by Shrike's own fix in that run*, to return a
+   two-field record instead of a bare integer. One comparison site kept comparing the
+   whole record against an integer, so the setup precondition of a reproduction test
+   could never hold. Shrike reported eight findings on that pull request, fixed all
+   eight, posted the report against the commit containing its fixes — and never re-ran
+   the caller enumeration over the contract *it* had just changed.
+3. An environment variable set a proxy's listen port while the container mapping stayed
+   hardcoded, so any override silently pointed the suite at an unexposed port (class E,
+   in a compose file, unasked).
+
+**Classes that absorb them.** B and H for the first, H for the second, E for the third.
+All three already have the shape, verbatim — "a validation, normalization, or masking
+step present on one path and missing from its sibling", "a changed signature... with
+callers left on the old contract". So: no new class, no new shape. Per the rule at the
+top of this file, this is a discipline problem, and the patches are all workflow.
+
+**Patches.**
+
+1. **Phase 7 — "the diff you did not review."** Fixes applied during the run are
+   unreviewed diff and get Phase 1's caller enumeration re-run over every symbol whose
+   contract the fix changed. Anything pushed after the reviewed head gets hunted as a
+   delta before the branch is called ready, and a rollup or integration pull request
+   counts as its own diff against its own base. Whatever stays unreviewed is named in
+   the report — silence reads as coverage.
+2. **`n/a` now needs evidence.** Declaring a class inapplicable is the cheapest possible
+   way to lose a bug: it closes a question without reading anything, asserted when the
+   diff is least understood. An `n/a` must state what was searched for and found absent,
+   not "no guards here".
+3. **Find the peer.** A Phase 1 step: for every behavior the change introduces, name the
+   nearest thing already doing that job — sibling helper, the same feature in another
+   package, the previous pull request that fixed this class, the linked issue's
+   acceptance criteria — and state where the change diverges. This is the one place the
+   bot showed a real method edge: nearly every finding it posted in the sample cited a
+   peer that already did it right. Class E covered the shape; nothing had told the hunt
+   to go *look* for the counterpart.
+4. **Coverage honesty on large diffs.** The two runs in the sample that reported honestly
+   differ starkly in effort per hunk: 44 hunks in 28 minutes raised 23 candidates, while
+   106 hunks in 8 minutes raised 11 — a fifth the candidate rate per hunk. The 5-finding
+   cap cannot distinguish a clean diff from a skimmed one, so the report now carries
+   hunks-per-hour and a *not reviewed* row, and the workflow says to slice a diff above
+   roughly 60 hunks and hunt each slice to the same depth — or declare the remainder.
+5. **Non-product code is in scope for slicing.** Five of the fourteen were in workflow
+   YAML, a compose file, a test harness, and shell scripts. A hunt aimed at product logic
+   stops looking there, and the scope contract's exclusion of *test coverage opinions* is
+   easy to over-read as excluding test and infrastructure code itself. It does not: a
+   harness that cannot fail, an alert that fires on the wrong branch, and a script that
+   leaves production files reverted after Ctrl-C are all correctness bugs.
+
+**Also worth recording: the bot's precision was high in this sample.** Every finding
+whose disposition was checked had a commit fixing it, and none of the fourteen read as a
+false positive on inspection. The economics stated at the top
+of `SKILL.md` still hold — a false positive costs more than a miss — but this sample says
+the miss side of that trade is being paid mostly at the process layer, not the method
+layer, and process is cheaper to fix than recall.

@@ -51,6 +51,13 @@ handler. Labelling is style; losing the ability to act is a bug.
 If a finding cannot be phrased as "when X happens, the program does Y, which is
 wrong," it is not a finding. Delete it.
 
+**Excluding "test coverage opinions" does not exclude test, harness, and
+infrastructure code.** A harness assertion that cannot hold, a fixture gate with a
+hole in it, an alert firing on the wrong branch, a container mapping contradicting the
+port the process binds, a script leaving production files reverted after `Ctrl-C` —
+each has a wrong outcome, so each is in scope. What stays out is *"add a test for
+this"*.
+
 ## Workflow
 
 Run these phases in order. Do not emit any finding before Phase 5.
@@ -98,6 +105,26 @@ single highest-yield step in the whole workflow: the most valuable bugs are almo
 never inside the diff. They are in the code that was written against the old
 behavior and was not updated. Use grep/ripgrep or an LSP; read the call sites.
 
+**Then find the peer and read it.** Almost nothing in a mature repo is the first of its
+kind. For each behavior the change introduces, name the nearest thing already doing
+that job — the sibling helper on the adjacent route, the same feature in another app or
+package, the pull request that fixed this class last time, the linked issue's
+acceptance criteria — and state where the change *diverges*. Divergence is not
+automatically a defect, but it is the densest seed available: one path retries a 503
+and its sibling does not, one predicate is truthy where its counterpart is a null
+check, one script traps `INT` and the two beside it do not. Each is a closed question
+one file read answers. This is class E worked deliberately instead of noticed by luck,
+and it is where a diff-local read loses hardest.
+
+**Size the hunt against the diff, and say what you did not hunt.** Effort per hunk
+decides recall, and a large diff starves it silently — worked honestly, a hunk costs
+minutes, not seconds. Above roughly 60 hunks, do not spread one pass thinner: slice by
+feature or subsystem and hunt each slice to the same depth, or hunt the slices carrying
+the behavior and **declare the remainder unhunted**. An undeclared thin pass is worse
+than a stated partial one, because "no findings" reads as coverage. Slice in the test
+harnesses, CI workflows, compose files, and scripts too — that is where a hunt aimed at
+product logic stops looking.
+
 If the diff arrives without repo access, say so explicitly in the report — the
 review is then diff-local and its recall is much lower.
 
@@ -118,6 +145,14 @@ its two layers, which do different jobs:
 Note in your Phase 2 output which classes are *live* for this change and which are
 not applicable — the report cites them, and a class you never asked is a gap you
 should be able to see.
+
+**`n/a` is a claim about the code and needs the same evidence as a clearance.**
+Declaring a class inapplicable is the cheapest way to lose a bug: it closes a question
+without reading anything, asserted when you know the diff least. Each `n/a` must name
+what you looked for and found absent — "grepped the diff for `catch`, `if`, `??`: no
+branch in it" — never "no guards here". Anything with a conditional has guards;
+anything with two writers has ordering; a CI workflow with an `if: failure()` step is
+dense with B and H. No evidence, no `n/a` — the class is live.
 
 Then read the checklist for the stack in play — these encode the failure modes that
 recur in each ecosystem:
@@ -199,8 +234,11 @@ and drop anything it tells you to suppress.
 Close out the measured numbers first:
 
 ```bash
-scripts/report_stats.sh          # elapsed time, files/hunks reviewed, commit range
+SHRIKE_PR=<pr> scripts/report_stats.sh   # elapsed, rate, files/hunks, range, unreviewed delta
 ```
+
+With `SHRIKE_PR` set it also reads the commit the previous report covered and prints
+what has been pushed since. A non-empty delta means Phase 7 is not done.
 
 Then render the report (format below), print it to the terminal, and — if this run is
 against a pull request — post the same markdown as one PR comment:
@@ -211,6 +249,35 @@ scripts/post_report.sh <pr-number> <report.md>    # upserts, never duplicates
 
 One comment per PR, updated in place on re-runs. Never post inline review comments:
 the whole point is one concentrated signal the human will actually read.
+
+### Phase 7 — the diff you did not review
+
+A report is only true of the commit range in its header. Two kinds of code routinely sit
+outside it, and both are how a reviewer that re-runs on every push wins without being
+smarter.
+
+**Fixes you applied during the run are unreviewed diff** — authored under time pressure,
+at exactly the places already known to be delicate, with no falsification pass over
+them. Before closing out, re-run Phase 1's caller enumeration on every symbol whose
+contract *your own fix* changed: a return widened into a record or tuple, a nullability
+flipped, a thrown type added, an argument inserted. A fix that changes a shape and
+leaves one consumer comparing against the old one is class H, and it is yours.
+
+**Anything pushed after the reviewed head is unreviewed.** Before declaring a branch
+ready, diff the reviewed head against the current one:
+
+```bash
+git diff <sha-in-the-last-report>..HEAD --stat   # two dots: what landed since
+```
+
+If that is non-empty, the report does not cover the branch. Hunt the delta at the same
+depth and update the comment — cheap, since the delta is small and the repo
+understanding is already loaded. The same holds for a rollup or integration pull
+request: it is a distinct diff against a distinct base, and reviewing each contributing
+branch is not reviewing their merge.
+
+Whatever stays unreviewed, name it. "Reviewed `abc1234...def5678`; three commits since,
+not hunted" is a usable sentence. Silence reads as coverage.
 
 ## Output format
 
@@ -225,9 +292,10 @@ findings, and the cleared list.
 | | |
 |---|---|
 | **Target** | `<branch or PR>` · `<base>...<head>` |
-| **Reviewed** | N files, N hunks, N callers outside the diff |
-| **Duration** | Nm Ns |
-| **Seeds worked** | N constructs · classes A,C,F,H live (B,D,E,G n/a) |
+| **Reviewed** | N files, N hunks, N callers outside the diff, N peers compared |
+| **Not reviewed** | N hunks / N commits — and which, or `none` |
+| **Duration** | Nm Ns — N hunks/hour |
+| **Seeds worked** | N constructs · classes A,C,F,H live (B,D,E,G n/a, each with what was searched) |
 | **Candidates** | N raised → N killed in falsification → **N reported** |
 | **Findings** | 🔴 N critical · 🟠 N high · 🟡 N medium |
 ```
@@ -238,6 +306,14 @@ or `no correctness bugs found that meet the evidence bar`.
 The candidates row is what makes the report trustworthy. A run that raised 14 and
 killed 12 is showing its work; a run that reports everything it thought of is not.
 Duration comes from `report_stats.sh`, never from a guess.
+
+The *not reviewed* row and the hunks-per-hour figure make thin coverage visible, which
+the 5-finding cap cannot: it does not distinguish a diff with two bugs from a diff that
+was skimmed. Read your own numbers before posting — a rate far above previous runs on
+this repo, or a candidate count that did not scale with the diff, means the pass was
+shallow, not that the code was clean. Either hunt the starved slices or move them to
+the *not reviewed* row. Never report `no correctness bugs found` for a range you did
+not work; say what you covered.
 
 ### Per finding
 

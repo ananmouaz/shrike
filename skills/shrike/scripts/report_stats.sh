@@ -3,12 +3,15 @@
 # Elapsed time comes from the stamp Phase 0 wrote; everything else from git.
 # Never fails the run — a missing number is printed as "?" , not an error.
 #
-# Usage: report_stats.sh [base-ref]
+# Usage: report_stats.sh [base-ref] [last-reviewed-sha]
 #        base-ref defaults to the merge-base with main/master.
+#        last-reviewed-sha defaults to the `shrike-head` stamp on the pull request's
+#        existing Shrike comment when SHRIKE_PR is set and gh is available.
 
 set -uo pipefail
 
 STAMP="${SHRIKE_START_FILE:-/tmp/shrike-start}"
+SECS=""
 
 # --- elapsed ---
 if [ -r "$STAMP" ]; then
@@ -52,12 +55,49 @@ fi
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "?")
 
+# --- effort per hunk: the number that exposes a skimmed pass ---
+# A hunk worked honestly costs minutes. A rate far above previous runs on this repo
+# means the pass was thin, not that the diff was clean.
+RATE="?"
+if [ -n "$SECS" ] && [ "$SECS" -gt 0 ] 2>/dev/null && [ "$HUNKS" != "?" ] \
+   && [ "$HUNKS" -gt 0 ] 2>/dev/null; then
+  RATE="$(( HUNKS * 3600 / SECS )) hunks/hour ($(( SECS / HUNKS ))s per hunk)"
+fi
+
+# --- what a previous report already covered, and what has landed since (Phase 7) ---
+LAST="${2:-}"
+if [ -z "$LAST" ] && [ -n "${SHRIKE_PR:-}" ] && command -v gh >/dev/null 2>&1; then
+  R="${GH_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)}"
+  if [ -n "$R" ]; then
+    LAST=$(gh api --paginate "repos/$R/issues/${SHRIKE_PR}/comments" \
+             --jq '[.[] | select(.body | startswith("<!-- shrike-report -->"))] | last | .body // empty' \
+           2>/dev/null | sed -n 's/.*<!-- shrike-head: \([0-9a-f]\{7,40\}\) -->.*/\1/p' | head -1)
+  fi
+fi
+
+DELTA="none — this is the first report on this branch"
+if [ -n "$LAST" ] && git cat-file -e "$LAST^{commit}" 2>/dev/null; then
+  D_COMMITS=$(git rev-list --count "$LAST"..HEAD 2>/dev/null || echo "?")
+  D_HUNKS=$( { git diff -U0 "$LAST"..HEAD 2>/dev/null; git diff -U0 2>/dev/null; } \
+             | grep '^@@' | wc -l | tr -d ' ' )
+  if [ "$D_COMMITS" = "0" ]; then
+    DELTA="nothing pushed since the last report ($(git rev-parse --short "$LAST" 2>/dev/null))"
+  else
+    DELTA="$D_COMMITS commit(s) / $D_HUNKS hunk(s) since $(git rev-parse --short "$LAST" 2>/dev/null) — HUNT THIS DELTA before reporting"
+  fi
+elif [ -n "$LAST" ]; then
+  DELTA="last reviewed sha $LAST is not in this repo — fetch it, or treat the branch as unreviewed"
+fi
+
 echo "duration:  $DURATION"
+echo "rate:      $RATE"
 echo "branch:    $BRANCH"
 echo "range:     $RANGE"
 echo "files:     $FILES"
 echo "hunks:     $HUNKS"
+echo "since:     $DELTA"
 echo
-echo "Fill the remaining header rows yourself — callers read outside the diff,"
-echo "which invariant classes were live, and the candidates raised/killed/reported"
-echo "counts are yours to report honestly. Do not round them in your favour."
+echo "Fill the remaining header rows yourself — callers read outside the diff, peers"
+echo "compared against it, which invariant classes were live and what you searched for"
+echo "the ones you called n/a, the candidates raised/killed/reported counts, and any"
+echo "slice you left unhunted. Report them honestly; do not round them in your favour."

@@ -43,6 +43,9 @@ tries to prove itself wrong.
 5. **Prove what's left.** Ideally by writing a failing test and running it. If the test
    passes, the finding was wrong — delete it.
 6. **Report at most five things**, and show the body count.
+7. **Hunt the diff you haven't reviewed** — the fixes the run just applied, and anything
+   pushed since the commit the report covers. A reviewer that runs once loses to a bot
+   that runs on every push, and it loses on coverage, not on reasoning.
 
 ## What a run looks like
 
@@ -52,8 +55,9 @@ tries to prove itself wrong.
 |                  |                                                       |
 |------------------|-------------------------------------------------------|
 | **Target**       | `fix/forced-dark-card-captures` · `3ecbfe0...bb7622b`  |
-| **Reviewed**     | 4 files, 31 hunks, 12 callers outside the diff         |
-| **Duration**     | 6m 12s                                                 |
+| **Reviewed**     | 4 files, 31 hunks, 12 callers outside, 2 peers compared |
+| **Not reviewed** | none                                                   |
+| **Duration**     | 6m 12s — 300 hunks/hour                                |
 | **Seeds worked** | 19 constructs · classes A,C,D,H live (B,E,F,G n/a)     |
 | **Candidates**   | 9 raised → 8 killed in falsification → **1 reported**  |
 | **Findings**     | 🔴 0 critical · 🟠 0 high · 🟡 1 medium                 |
@@ -62,6 +66,10 @@ tries to prove itself wrong.
 **The row that matters is `Candidates`.** Nine raised, eight killed, one survived. A
 tool that reports everything it thought of is not showing you its work — it's showing
 you its stream of consciousness.
+
+`Not reviewed` is the other honest row. A report is only true of the commit range in its
+header, so anything outside it — a slice too big to hunt at depth, commits pushed after
+the run, fixes the run itself applied — gets named instead of quietly counting as clean.
 
 The numbers are measured, not vibes. Duration is stamped at the start and computed at
 the end, because "took about 5 minutes" is exactly the kind of thing you shouldn't

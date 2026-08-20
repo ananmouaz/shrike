@@ -30,12 +30,19 @@ fi
 
 REPO="${GH_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}"
 
+REVIEWED_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+
 BODY_FILE=$(mktemp)
 trap 'rm -f "$BODY_FILE"' EXIT
 {
   printf '%s\n' "$MARKER"
+  # Machine-readable stamp of the commit this report covers. A later run reads it
+  # (report_stats.sh) to diff what has been pushed since, so "reviewed" always names
+  # a specific commit rather than "the branch".
+  printf '<!-- shrike-head: %s -->\n' "$REVIEWED_HEAD"
   cat "$FILE"
-  printf '\n\n<sub>🔪 Shrike · updated in place on each push</sub>\n'
+  printf '\n\n<sub>🔪 Shrike · updated in place on each push · reviewed `%s`</sub>\n' \
+    "${REVIEWED_HEAD:0:8}"
 } > "$BODY_FILE"
 
 # Find an existing Shrike comment on this PR.
