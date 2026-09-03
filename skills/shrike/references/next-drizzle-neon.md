@@ -34,6 +34,14 @@ Apply as seeds, then trace and falsify. A pattern match is a question, not a fin
   overwrite newer data. Requires a realistic ordering scenario to report.
 - Stale closure in a callback with a wrong or empty dependency array, where the
   captured value is used to compute something written back.
+- **`router.refresh()` refreshes server props while local `useState` does not.** A
+  form initialized from props keeps the pre-refresh value; if a concurrency guard is
+  computed from the *fresh* props and the payload comes from the *stale* state, the
+  guard passes and writes the stale value back — the check certifies the write it
+  should have blocked.
+- **`x || fallback` on numeric or boolean edit defaults.** A stored `0` or `false`
+  takes the fallback, so opening a form and saving it without changes silently rewrites
+  the value. Use `??`, and check what the field's zero legitimately means.
 - State update after unmount on an async resolution.
 - Missing `await` on a promise whose completion the next statement depends on;
   unhandled rejection in a route handler taking down the request.
@@ -91,6 +99,9 @@ Apply as seeds, then trace and falsify. A pattern match is a question, not a fin
   `params` lookups, env vars).
 - Zod/valibot schema and the TS type drifting apart — the schema is what runs.
 - `JSON.parse` results treated as typed without validation.
+- **An ISO shape plus a non-`NaN` `Date` is not calendar validation.** V8 rolls
+  `2026-02-30` and `2026-13-01` over into valid dates, so a regex-and-parse check
+  accepts days that do not exist. Compare the parsed components back to the input.
 - Optional chaining that silently produces `undefined` where a default was intended,
   then flows into arithmetic (`undefined + 1` → `NaN`) or a query.
 
@@ -99,6 +110,11 @@ Apply as seeds, then trace and falsify. A pattern match is a question, not a fin
 - Currency or point balances in floating point — use integer minor units. High.
 - Increment implemented as read-modify-write in application code rather than an atomic
   SQL update. Concurrent requests lose updates.
+- **Optimistic concurrency via a version column, with a writer that does not bump it.**
+  The guard can only detect writes that touch the version, so a partial write path (a
+  kill switch flipping one column, a background reconciler) is invisible to it and gets
+  overwritten by the next guarded save. Enumerate every writer of the row, not every
+  reader of the version.
 - Webhook or payment handler with no idempotency key — replays double-apply. Critical
   in a rewards/payments context.
 

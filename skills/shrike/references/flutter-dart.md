@@ -50,9 +50,42 @@ a *question*, not a finding.
 - **`didUpdateWidget` (or `build`) synchronously driving a controller** —
   `jumpToItem`/`animateTo` firing an `onChanged` that calls `setState` during the
   parent's rebuild is reentrancy: debug assert, or silently dropped frame state.
+- **`ref.invalidate` on a provider something is already awaiting.** Invalidating an
+  `autoDispose` provider while another frame holds `ref.read(p.future)` can leave that
+  future never completing — the awaiter hangs, with no error to surface. Worse in
+  combination with a `.timeout()` at the await site: the timeout fails *that* await
+  open but does not complete the underlying future, so a second await of the same
+  future blocks again — and anything irreversible done in between (a consumed share
+  buffer, a cleared plugin intent) is already gone.
+- **`AsyncValue.when` on a refresh path.** `when` takes the `error` branch even when a
+  previous value is retained, so a failed background refresh replaces loaded content
+  with the retry placeholder. Check the sibling screens: if they use a helper that
+  keeps stale data on error, the divergence is the finding.
+- **A lifecycle trigger added without the precondition its original call site had.**
+  A check rewired to `AppLifecycleState.resumed` also runs pre-auth; if the provider
+  behind it requires a user id, every signed-out resume throws, and an error recorder
+  in that path turns expected failures into crash-reporter noise that reads as a real
+  outage.
 - **Provider/container dispose resetting a process-global.** A `ref.onDispose` that
   nulls a static/global (token reader, service locator entry) clobbers whatever a
   newer container already installed there.
+
+## Navigation and reporting
+
+- **`context.go` / `pop` and then using the same context.** A dialog, snackbar, or
+  sheet shown from the context of the route the navigation just removed races the
+  teardown and can be dropped silently. If the previous version had an `await` between
+  the two, the change deleted the ordering that made it work — an incidental await is
+  load-bearing exactly until someone removes it.
+- **Route observers reading `route.settings.name`.** Routes declared with `builder` and
+  no `name` all report the fallback, so a crash-context or analytics observer records
+  `(unnamed)` for most screens. Read how the routes in the table are actually declared,
+  not the one example that sets a name.
+- **Crash reports and custom keys emitted before Firebase is initialized.**
+  `recordError` and `setCustomKey` no-op until the SDK is up (implementations may
+  buffer keys; none buffer errors), so anything reported from `install()` or early
+  bootstrap is dropped. Then check the latch: a flag marking a key "already synced",
+  set on that dropped write, means a later ready SDK never receives it either.
 
 ## Data and persistence
 

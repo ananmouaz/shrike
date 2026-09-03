@@ -33,7 +33,9 @@ For each candidate, in order:
   transaction, cancels it on unmount, or guarantees ordering. Confirm the specific
   guarantee; do not assume one exists because it usually does.
 - **Already tested.** A test covers this exact case. Find it and read it — a test with
-  a matching *name* that does not actually assert the behavior is not a rebuttal.
+  a matching *name* that does not actually assert the behavior is not a rebuttal. The
+  decisive form: revert the production hunk and run that test. Still green means it was
+  never a rebuttal, and the test itself is now a second finding.
 - **Intentional.** A comment, a config, or a domain rule says this is deliberate. If
   intentional but still dangerous, it is at most Medium and must be framed as such.
 - **Pre-existing.** The bug is not introduced by this change. Still reportable if
@@ -67,6 +69,9 @@ Ask these about the report as a whole:
 
 - Would a competent author of this code accept every one of these, or roll their eyes
   at any of them? Delete the eye-roll ones.
+- Did each Phase 3 sweep produce an *instance list* with a verdict per row, or a
+  conclusion? "No post-await issues" over a diff whose `await`s were never enumerated
+  is not a clearance; it is the sweep not having run.
 - Did I report anything a linter or the compiler would have caught? Remove it.
 - Did I hedge anywhere ("might", "could potentially", "consider whether")? Hedged
   findings are unfalsified findings. Either close the gap or delete.

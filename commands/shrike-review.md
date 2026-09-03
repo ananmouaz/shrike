@@ -22,5 +22,9 @@ Two things about the output:
   same markdown as one PR comment with `scripts/post_report.sh <pr> <report.md>` —
   it upserts, so re-runs replace the previous report instead of stacking copies, and
   stamps the reviewed commit in the comment.
+- Log the run with `scripts/log_run.sh` before you finish, with the per-instance sweep
+  counts and the candidates line. It keys the record on the head SHA, which is what lets
+  Phase 7 (and any later question about what escaped) tell a miss on reviewed code apart
+  from a bug pushed after the report.
 - Do not stop at Phase 6 if you fixed anything or the branch moved. Phase 7 exists
   because a report is only true of the commit range in its header.

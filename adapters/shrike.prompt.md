@@ -79,6 +79,11 @@ is the densest seed available: one path retries a 503 and its sibling does not, 
 predicate is truthy where its counterpart is a null check, one script traps `INT` and
 the two beside it do not. Each is a closed question one file read answers.
 
+**When the change replaces something, the replaced code is the peer.** A rewrite or
+"v2" module inherits every constraint the old one encoded and states none of them. Read
+what it replaces — comments, guards, config keys, documented conflicts — and show each
+is carried forward or deliberately dropped.
+
 **Size the hunt against the diff, and record what you did not hunt.** Effort per hunk
 decides recall; a large diff starves it silently. Above roughly 60 hunks, slice by
 feature or subsystem and hunt each slice to the same depth, or hunt the slices carrying
@@ -104,6 +109,10 @@ concentrate, each posing a closed question that reading code can answer.
 | Loop with mutable accumulator | First iteration, last, empty input, single element. |
 | `<` vs `<=` | Inclusive or exclusive — does it match the caller's assumption? |
 | Write path (update/delete/upsert) | Scoped? In a transaction? Idempotent under retry? |
+| Effect registration or sink write (`register`, `subscribe`, `setCustomKey`, `report`) | Is the sink live at this line, and does its only consumer read before or after it? |
+| Concurrency token read for a guard (version, etag, sequence) | Does every writer bump it, and is the payload it protects from the same snapshot as the check? |
+| Status or completion write (`delivered_at`, `status = 'done'`) | Did the operation confirm the effect landed — for every member the write covers? |
+| A test added or changed in the same diff | Would it fail with the production hunk it covers reverted? |
 | External input reaching a sink | Validated at *this* boundary, or assumed elsewhere? |
 | Authorization-relevant handler | Real check, using server-derived identity? |
 | Money / quantity arithmetic | Integer or float? Rounding? Can it go negative? |
@@ -131,14 +140,19 @@ a CI workflow with an `if: failure()` step is dense with B and H. No evidence, n
 counted as entities; two units summed; rows attempted reported as rows written; a
 scoped result used as global; money in floats; s vs ms; a cleared value meaning
 "unbounded" to one side and "none" to the other; an enum falling through to a default
-that means something else; a label or caveat asserting what the data contradicts.
+that means something else; a budget measured from a start including work it does not
+cover; a label or caveat asserting what the data contradicts.
 
 **B. A guard with an uncovered path** — enumerate every way into and out of the guarded
 region: which path skips the check, and which legitimate caller does it now wrongly
 reject? Validators failing open on error/empty/unparsed input; an oracle proving a
-proxy (name exists, keyword present) not the property; release only on the happy path;
-a flag set on one event and cleared only on another; a skip that omits the bookkeeping
-write the main path performs; a tightened guard breaking service or admin callers.
+proxy (name exists, keyword present) not the property; presence checked as truthiness
+(`0`, `""`, `false`, cleared) or as a bare null check that counts `""` and half-filled
+records as filled; a gate keyed on a lossy projection of what it guards, so an edit its
+summary cannot describe reads as no edit; a flag set on one event and cleared only on
+another; a skip that omits the bookkeeping write the main path performs; an affordance
+the server disagrees with, including a prompt offering an exit the handler rejects; a
+tightened guard breaking service or admin callers.
 
 **C. Stale state** — between capture and use, what else can change this? State captured
 before an `await`; a later pipeline pass judged against the original input; a gate on
@@ -154,20 +168,30 @@ no row, leaving a stale prior value reading as current.
 
 **E. Duplicated truth** — what else encodes this same fact or rule, and did the diff
 update all of them? A default in the client and again in a DB function; a predicate in
-a badge and in the filter it describes; docs naming an enum the schema rejects; a new
-route missing from a parallel allowlist; one of two sibling paths missing a side
-effect; a precedence order disagreeing between two levels of aggregation.
+a badge and in the filter it describes; docs naming an enum the schema rejects; a string
+that must match one another layer generates, or a field the reader keys on that its
+producers leave unset, where the mismatch is silent; a new route missing from a parallel
+allowlist; one of two sibling paths missing a side effect; a precedence order
+disagreeing between two levels of aggregation.
 
 **F. Failure that does not degrade** — for each way this fails, what does the caller
 observe and what state is left? Success returned because a local precondition holds
-while the remote step failed; error conflated with empty; a recovery handler whose own
-I/O can throw and kill the operation; a fallback re-issuing work the primary already
-retried to exhaustion; a destructive consume before the dependent operation commits.
+while the remote step failed, or a done-marker latched on an attempt whose effect never
+landed, so nothing retries it; a batch whose result cannot express per-member outcome,
+so the caller stamps every member done; error conflated with empty; a recovery handler
+whose own I/O can throw and kill the operation; a fallback re-issuing work the primary
+already retried to exhaustion; a destructive consume before the dependent operation
+commits.
 
 **G. Ordering assumed rather than enforced** — what ordering does this need, and what
-guarantees it? Read-then-write with no transaction; a fixed sleep standing in for a
-signal; a dismissal handler committing while the click that dismissed it also fires; a
-gate false on first render and set in a later effect; independent schedules overlapping.
+guarantees it? Read-then-write with no transaction, atomic update, or write predicate
+carrying the state the decision was read from; a generation guard some writers never
+bump, or read fresh while the payload it protects stays stale — the check passes and the
+stale write lands; a clear or teardown sequenced before the bump that would drop
+in-flight writes; an effect emitted before its sink is initialized, or registered after
+its only consumer read — it silently no-ops; a fixed sleep standing in for a signal; a
+dismissal handler committing while the click that dismissed it also fires; a gate false
+on first render and set in a later effect; independent schedules overlapping.
 
 **H. Blast radius not followed** — what outside the diff depends on what it changed?
 Callers left on the old contract; a renamed field still read by persisted rows; a
@@ -198,6 +222,43 @@ enumerate every exit from the scope, including early returns, throws, and cancel
 A single missing exit path is enough, but you must name it.
 
 Quote the lines you read. A trace you didn't actually open is a guess.
+
+**Then run four sweeps that enumerate rather than conclude.** An invariant class is one
+question asked of the whole change, and one answer closes it — the right shape for a
+semantic question, the wrong shape for four families where the defect is *per instance*.
+A diff can honestly satisfy "is there stale state here?" on the first `await` that looks
+fine and still carry nine unread ones. So build the instance list, put a verdict on every
+row, and report the counts. A sweep reported without its list was not run.
+
+1. **Post-await state** — every `await` in the changed files whose enclosing function
+   afterwards touches something captured before it (a local, an instance field, a
+   `ref`/context/store handle, `mounted`, a row a decision was read from). Per row: what
+   was captured, what can change it while the await is open, and the re-read, currency
+   check, or guard that makes the later use safe. Watch for the partial case — the diff
+   adds the guard at one such read and leaves its sibling three lines down.
+2. **Presence and absence** — every guard deciding whether a value was supplied
+   (`if (x)`, `x || d`, `x ?? d`, `!= null`, `.isEmpty`, `= false`, an edit form's
+   prefilled defaults). Per row: name the legal values that take the absent branch (`0`,
+   `""`, `false`, `[]`, a record with some fields filled) and which of them real input
+   can produce. A stored `0` on an edit path and a whitespace-only string from an
+   extractor are the two that recur.
+3. **Effect order** — every registration, subscription, observer, custom key, or report
+   in the diff. Per row: is the sink initialized at that line, and where does its only
+   consumer read? Both orderings fail silently — emitted before the sink exists, or
+   registered after the single read that mattered. Then check every latch recording the
+   effect as done: set on the attempt, or on the confirmation?
+4. **Test power** — every test added or changed in the diff. Per row: revert the
+   production hunk that test is supposed to cover, run it, and record whether it went
+   red. A test that stays green asserts something other than the behavior the change
+   exists to protect, and it is a finding: the suite now certifies a regression as fixed.
+   Where reverting is impractical, name the assertion that would fail and the input that
+   reaches it, and check the fixtures actually contain a case of the class under test — a
+   setup filter excluding every input the regression would produce reads as a passing
+   test forever.
+
+Sweep 4 is the one a diff-comment reviewer cannot run: a test that tests nothing is an
+*absence*, with no wrong line to point at. Do not skip it because it found nothing last
+time.
 
 ### Phase 4 — Falsification → `.shrike/4-survivors.md`
 
@@ -259,12 +320,15 @@ stamp Phase 0 wrote (`date +%s > /tmp/shrike-start`), not from a guess:
 | **Not reviewed** | N hunks / N commits — and which, or `none` |
 | **Duration** | Nm Ns — N hunks/hour |
 | **Seeds worked** | N constructs · classes A,C,F,H live (B,D,E,G n/a, each with what was searched) |
+| **Sweeps** | post-await N · presence N · effect-order N · tests N of N reverted red |
 | **Candidates** | N raised → N killed in falsification → **N reported** |
 | **Findings** | 🔴 N critical · 🟠 N high · 🟡 N medium |
 ```
 
 The candidates row is what makes the report trustworthy: a run that raised 14 and
-killed 12 is showing its work. The *not reviewed* row and the hunks-per-hour figure
+killed 12 is showing its work. The sweeps row carries instance counts, not adjectives —
+`post-await 0` on a diff full of async code is a skipped sweep, and should be visible as
+one. The *not reviewed* row and the hunks-per-hour figure
 make thin coverage visible, which the 5-finding cap cannot: a rate far above your
 previous runs on this repo, or a candidate count that did not scale with the diff,
 means the pass was shallow — not that the code was clean. Never report `no correctness
@@ -310,7 +374,22 @@ else gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@body.md; fi
 ```
 
 The `shrike-head` stamp records which commit the report covers, so the next run can diff
-what has landed since.
+what has landed since. **Record the run locally too** — nothing else leaves a trace that
+a hunt happened, so coverage cannot be measured and the next run cannot know which commit
+was already hunted:
+
+```bash
+mkdir -p .agent && cat >> .agent/shrike-log.md <<EOF
+## $(date -u +%Y-%m-%dT%H:%M:%SZ) — ${TARGET:-$(git rev-parse --abbrev-ref HEAD)}
+- head=\`$(git rev-parse HEAD)\` branch=\`$(git rev-parse --abbrev-ref HEAD)\`
+- sweeps: post-await N · presence N · effect-order N · tests N/N
+- candidates: N raised → N killed → N reported
+- unreviewed: <what you did not hunt, or none>
+EOF
+```
+
+Keyed on the head SHA, because a record against a *pull request* cannot tell a genuine
+miss from a bug in code pushed after the report — and those have different fixes.
 
 Close with **Checked and cleared** — 3–6 things you specifically investigated and ruled
 out, with reasons. This is what makes a zero-finding run trustworthy rather than lazy.

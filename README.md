@@ -35,6 +35,11 @@ tries to prove itself wrong.
 3. **Ask a fixed list of questions.** Not "look for bugs" (which has no finish line, so
    the model stops when it gets bored and starts inventing). A bounded set of specific
    questions that reading code answers yes or no. When they're answered, the pass is over.
+   Four families are *per instance* rather than per change, so they're worked as
+   enumerations with a verdict on every row: every `await` followed by a use of state
+   captured before it, every guard deciding whether a value was supplied, every effect
+   registered relative to its only reader, and every test the diff touched — reverted and
+   re-run, because a test that still passes with the fix removed is certifying nothing.
 4. **Then turn hostile.** Switch sides and attack every candidate finding: is there a
    guard upstream? A type that makes the bad value impossible? A framework guarantee? A
    test that already covers it? **If the rebuttal can't be closed by pointing at actual
@@ -165,6 +170,7 @@ it can run this.
 | `adapters/` | Drop-in wiring for `AGENTS.md`-convention agents |
 | `commands/` | `/shrike-review` slash command for Claude Code |
 | `templates/` | Starter `review-rules.md` and a GitHub Actions workflow |
+| `skills/shrike/scripts/` | The deterministic bits: analyzer pass, measured report stats, PR-comment upsert, run log |
 | `scripts/build_portable.sh` | Rebuilds `dist/` from `skills/` so the two don't drift |
 | `MISSES.md` | The ledger — every bug Shrike missed, why, and what changed as a result |
 
@@ -325,3 +331,15 @@ already know the answer and track one number: **how many comments you dismissed.
   falsification pass meaner.
 - Real bugs slipping through → widen the context first (chase more callers) before
   loosening the evidence bar. Loosening the bar is how you get back to eighteen comments.
+
+**Don't measure it by another bot's findings per PR.** That number is confounded by diff
+size — bigger diffs carry fewer findings per line, so any reviewer used on bigger pull
+requests looks good for free — and it can't see the class this method wins on, since a
+test that tests nothing is an absence with no line to comment on. Measure instead:
+dismissal rate per run, recall against your own list of bugs that escaped, and how often
+a changed test survives having its production hunk reverted.
+
+And keep the receipts. `scripts/log_run.sh` appends one record per run keyed on the head
+SHA — without it, "was this commit reviewed?" is answered by digging through transcripts,
+and a finding on a reviewed *pull request* can't be told apart from a finding on code
+pushed after the report. Those are different failures with different fixes.

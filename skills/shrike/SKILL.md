@@ -116,6 +116,14 @@ check, one script traps `INT` and the two beside it do not. Each is a closed que
 one file read answers. This is class E worked deliberately instead of noticed by luck,
 and it is where a diff-local read loses hardest.
 
+**When the change replaces something, the replaced code is the peer.** A rewrite,
+migration, or "v2" module inherits every constraint the old one encoded and states
+none of them. Read what it replaces — its comments, its guards, its config keys, the
+conflicts it documented — and show each is carried forward or deliberately dropped.
+A constraint that survives only as a comment in the file being deleted is the one that
+gets lost: the model name a sibling module records as incompatible with the regional
+endpoint, the predicate a later migration already tightened elsewhere.
+
 **Size the hunt against the diff, and say what you did not hunt.** Effort per hunk
 decides recall, and a large diff starves it silently — worked honestly, a hunk costs
 minutes, not seconds. Above roughly 60 hunks, do not spread one pass thinner: slice by
@@ -180,6 +188,50 @@ reasoning about what code probably does.
   and cancellation.
 
 Open the files. Quote the lines. A trace you did not actually read is a guess.
+
+#### Four sweeps that enumerate rather than conclude
+
+An invariant class is one question asked of the whole change, and one answer closes it.
+That is the right shape for a semantic question and the wrong shape for four families
+where the defect is *per instance*: a diff can satisfy "is there stale state here?" and
+still contain nine unguarded post-await reads. Asked as a class, these clear on the
+first instance that looks fine. So work them as **enumerations** — build the instance
+list, put a verdict on every row, and carry the counts into the report header. A sweep
+reported without its instance list was not run. Each has a construct row in
+`references/seeds-and-slicing.md` stating its question; what follows is the population
+to enumerate and what a row has to say.
+
+1. **Post-await state.** Population: every `await` in the changed files whose enclosing
+   function afterwards touches something captured before it — a local, an instance
+   field, a `ref`/context/store handle, `mounted`, a row read earlier, a snapshot a
+   decision was made from. Per row: what was captured, what can change it while the
+   await is open, and the re-read, currency check, or `mounted` guard that makes the
+   later use safe. Absent all three, it is a candidate. Watch for the partial case —
+   the diff adds the guard at one such read and leaves its sibling three lines down.
+2. **Presence and absence.** Population: every guard in the diff deciding whether a
+   value was supplied — `if (x)`, `x || d`, `x ?? d`, `!= null`, `.isEmpty`, `= false`,
+   the defaults an edit form prefills. Per row: name the legal values that take the
+   absent branch (`0`, `""`, `false`, `[]`, a record with some fields filled) and say
+   which of them real input can produce. A stored `0` on an edit path and a
+   whitespace-only string from an extractor are the two that recur.
+3. **Effect order.** Population: every registration, subscription, observer, custom
+   key, or report emitted in the diff. Per row: is the sink initialized at that line,
+   and where does its only consumer read? Both orderings fail silently — emitted before
+   the sink exists, or registered after the single read that mattered. Then check every
+   latch that records the effect as done: set on the attempt, or on the confirmation?
+4. **Test power.** Population: every test added or changed in the diff. Per row: revert
+   the production hunk that test is supposed to cover, run the test, and record whether
+   it went red. A test that stays green is asserting something other than the behavior
+   the change exists to protect, and it is a finding — the suite now certifies a
+   regression as fixed. Where reverting is impractical, name the assertion that would
+   fail and the input that reaches it, and check the fixtures actually contain a case
+   of the class under test: a setup filter that excludes every input the regression
+   would produce is the usual shape, and it reads as a passing test forever.
+
+Sweep 4 is the one no diff-comment reviewer can run. A test that tests nothing is an
+*absence* — there is no wrong line to point at — so a reviewer that only annotates
+changed lines cannot report it, and neither can a metric counting its findings. Do not
+skip it because it produced nothing last time.
 
 ### Phase 4 — Falsification (the pass that matters most)
 
@@ -250,6 +302,25 @@ scripts/post_report.sh <pr-number> <report.md>    # upserts, never duplicates
 One comment per PR, updated in place on re-runs. Never post inline review comments:
 the whole point is one concentrated signal the human will actually read.
 
+**Then record the run.** Nothing else in this workflow leaves a trace that it ran, and
+without one, coverage cannot be measured and the next run cannot know which commit was
+already hunted:
+
+```bash
+scripts/log_run.sh --pr <pr> --candidates 14 --killed 12 --reported 2 \
+                   --findings "1 high, 1 medium" --unreviewed none
+```
+
+It appends one line per run to `.agent/shrike-log.md` (override with `SHRIKE_LOG`),
+keyed on the **head SHA** — target, base...head, files/hunks, duration, sweep counts,
+candidates raised/killed/reported, and whatever was left unreviewed. Two things depend
+on it: Phase 7 reads `scripts/log_run.sh --last` to find the commit the previous report
+covered without needing the PR comment, and a later question of the form "did reviewing
+actually reduce escaped bugs" is answerable at commit granularity instead of being
+reconstructed from transcripts. Reconstructed attribution is why that question usually
+comes back inconclusive: a run recorded against a *pull request* cannot tell a genuine
+miss from a bug in code pushed after the report.
+
 ### Phase 7 — the diff you did not review
 
 A report is only true of the commit range in its header. Two kinds of code routinely sit
@@ -267,8 +338,12 @@ leaves one consumer comparing against the old one is class H, and it is yours.
 ready, diff the reviewed head against the current one:
 
 ```bash
-git diff <sha-in-the-last-report>..HEAD --stat   # two dots: what landed since
+LAST=$(scripts/log_run.sh --last)   # or the sha stamped in the last posted report
+git diff "${LAST:?no run record for this branch — treat all of it as unreviewed}"..HEAD --stat
 ```
+
+The `:?` matters: an empty sha makes `git diff ..HEAD` a no-op that prints nothing, and
+"nothing landed since" is exactly the false clearance this phase exists to prevent.
 
 If that is non-empty, the report does not cover the branch. Hunt the delta at the same
 depth and update the comment — cheap, since the delta is small and the repo
@@ -296,6 +371,7 @@ findings, and the cleared list.
 | **Not reviewed** | N hunks / N commits — and which, or `none` |
 | **Duration** | Nm Ns — N hunks/hour |
 | **Seeds worked** | N constructs · classes A,C,F,H live (B,D,E,G n/a, each with what was searched) |
+| **Sweeps** | post-await N · presence N · effect-order N · tests N of N reverted red |
 | **Candidates** | N raised → N killed in falsification → **N reported** |
 | **Findings** | 🔴 N critical · 🟠 N high · 🟡 N medium |
 ```
@@ -306,6 +382,12 @@ or `no correctness bugs found that meet the evidence bar`.
 The candidates row is what makes the report trustworthy. A run that raised 14 and
 killed 12 is showing its work; a run that reports everything it thought of is not.
 Duration comes from `report_stats.sh`, never from a guess.
+
+The sweeps row carries instance counts, not adjectives: `post-await 9` means nine
+`await`s were enumerated and each got a verdict. `post-await 0` on a diff full of async
+code is a sweep that was skipped, and it should be visible as one. For the test sweep,
+report how many of the changed tests were actually run against a reverted hunk — that
+is the only form of the claim that means anything.
 
 The *not reviewed* row and the hunks-per-hour figure make thin coverage visible, which
 the 5-finding cap cannot: it does not distinguish a diff with two bugs from a diff that

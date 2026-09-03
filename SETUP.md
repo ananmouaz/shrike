@@ -162,6 +162,14 @@ Run it on ~10 PRs where you already know what's in them. Track one number:
   CodeRabbit-grade noise.
 - Every dismissal → an entry in `review-rules.md`. This is the compounding part.
 
+Do not use "findings another reviewer posted per PR" as the score. It is confounded by
+diff size — bigger diffs carry fewer findings per line — and it cannot see the class this
+method wins on, because a test that tests nothing is an absence with no line to comment
+on. And keep the run log (`scripts/log_run.sh`, appending to `.agent/shrike-log.md`):
+without a per-commit record, a bug found on a reviewed *pull request* cannot be told
+apart from a bug in code pushed after the report, and those have different fixes —
+recall versus coverage.
+
 Only once that number is stable should you turn on automatic PR triggers, roll out to
 the other repos, or make it a required check. A false positive that blocks a merge in
 week one is how the tool gets deleted in week two.

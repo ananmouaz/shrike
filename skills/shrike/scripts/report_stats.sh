@@ -6,7 +6,8 @@
 # Usage: report_stats.sh [base-ref] [last-reviewed-sha]
 #        base-ref defaults to the merge-base with main/master.
 #        last-reviewed-sha defaults to the `shrike-head` stamp on the pull request's
-#        existing Shrike comment when SHRIKE_PR is set and gh is available.
+#        existing Shrike comment when SHRIKE_PR is set and gh is available, and falls
+#        back to the last head SHA `log_run.sh` recorded for this branch.
 
 set -uo pipefail
 
@@ -19,7 +20,11 @@ if [ -r "$STAMP" ]; then
   NOW=$(date +%s)
   if [ -n "$START" ] && [ "$START" -gt 0 ] 2>/dev/null && [ "$NOW" -ge "$START" ]; then
     SECS=$((NOW - START))
-    if [ "$SECS" -ge 60 ]; then
+    if [ "$SECS" -gt 86400 ]; then
+      # Older than a day: a leftover stamp from an earlier session, not this run.
+      DURATION="? (stale start stamp — re-stamp and re-measure)"
+      SECS=""
+    elif [ "$SECS" -ge 60 ]; then
       DURATION="$((SECS / 60))m $((SECS % 60))s"
     else
       DURATION="${SECS}s"
@@ -75,7 +80,13 @@ if [ -z "$LAST" ] && [ -n "${SHRIKE_PR:-}" ] && command -v gh >/dev/null 2>&1; t
   fi
 fi
 
-DELTA="none — this is the first report on this branch"
+# No pull request, no gh, or no previous comment: the run log is the local record.
+if [ -z "$LAST" ]; then
+  LOGGER="$(dirname "$0")/log_run.sh"
+  [ -x "$LOGGER" ] && LAST=$("$LOGGER" --last 2>/dev/null | tr -dc '0-9a-f')
+fi
+
+DELTA="none — no previous report or run record for this branch"
 if [ -n "$LAST" ] && git cat-file -e "$LAST^{commit}" 2>/dev/null; then
   D_COMMITS=$(git rev-list --count "$LAST"..HEAD 2>/dev/null || echo "?")
   D_HUNKS=$( { git diff -U0 "$LAST"..HEAD 2>/dev/null; git diff -U0 2>/dev/null; } \
@@ -99,5 +110,6 @@ echo "since:     $DELTA"
 echo
 echo "Fill the remaining header rows yourself — callers read outside the diff, peers"
 echo "compared against it, which invariant classes were live and what you searched for"
-echo "the ones you called n/a, the candidates raised/killed/reported counts, and any"
-echo "slice you left unhunted. Report them honestly; do not round them in your favour."
+echo "the ones you called n/a, the per-instance sweep counts, the candidates"
+echo "raised/killed/reported counts, and any slice you left unhunted. Report them"
+echo "honestly; do not round them in your favour. Then log the run: log_run.sh."

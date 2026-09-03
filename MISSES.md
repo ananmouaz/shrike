@@ -421,3 +421,168 @@ false positive on inspection. The economics stated at the top
 of `SKILL.md` still hold — a false positive costs more than a miss — but this sample says
 the miss side of that trade is being paid mostly at the process layer, not the method
 layer, and process is cheaper to fix than recall.
+
+---
+
+## Study 5 — a 78-run cohort, and why the corpus outranks the numbers
+
+The largest sample so far, and the first one assembled by asking the opposite question:
+not "what did the reviewer find" but **"did running Shrike reduce what escaped?"** Every
+hunt recoverable from agent transcripts in one repository over a month — 78 runs across
+48 pull requests, against 176 merged in the window — set beside every inline finding a
+commercial reviewer posted on those same pull requests. Thirty-seven of its findings
+landed on pull requests a hunt had already cleared.
+
+**The outcome number is inconclusive, and that is the honest headline.** Per pull
+request the hunted cohort drew 0.79 findings against 1.26 unhunted, one-sided
+permutation p=0.032. It does not survive two checks:
+
+1. **Size normalization.** Within the same era the two cohorts sit at 0.32 and 0.37
+   findings per thousand changed lines — noise. The per-pull-request gap is mostly
+   *hunted pull requests were bigger, and big diffs carry fewer findings per line*.
+2. **Attribution sensitivity.** Only 21 of the 78 runs could be tied to a branch with
+   certainty. That verified subset sits at 0.65 findings per thousand lines —
+   indistinguishable from never running it at all.
+
+Compliance was partial too: pull requests averaged 3.7 commits against 1.7 runs, so most
+pushes shipped with no hunt. So this study throws the cohort arithmetic away and treats
+the 37 as a corpus. **An improvement pass must not start from "it already works."**
+
+**Attribution was per pull request, which hides the split Study 4 measured.** A finding
+on a *pull request* that was hunted is not the same thing as a finding on the *commit*
+that was hunted. Study 4's smaller sample split fourteen findings 8 / 3 / 3 between "no
+run at all", "code pushed after the report", and "same commit, genuine miss" — so an
+unknown and probably large share of these 37 are coverage, not recall, and the two have
+different fixes. Nothing in the workflow recorded which commit had been hunted, so the
+split could not be recovered here. That is the first patch, and it is the one that makes
+the next eval repeatable.
+
+**How the 37 classify.** By defect class, largest cluster first: post-await state and
+lost updates (10), a legal `0`/`""`/partial set read as absent (6), input-normalization
+edges (5), a side effect that never fires (4), declared-but-never-consumed drift (4), a
+status written without verifying the effect (3), other (5). Twenty-two of the 37 matched a
+shape already written in `seeds-and-slicing.md`, several of them verbatim — which by the
+rule at the top of this file makes them a discipline problem, not a taxonomy problem.
+
+### The structural finding: per-instance defects asked as a per-change question
+
+Twenty of the 37 sit in three families that are *mechanically enumerable* — an
+`await` followed by a use of state captured before it, a guard deciding whether a value
+was supplied, an effect registered relative to its only consumer's read. Every one of
+those already had a construct row, a class, or both. They were missed anyway, and the
+mechanism is structural rather than lazy:
+
+> An invariant class is **one question asked of the whole change**, and one answer
+> closes it. These defects are **one per instance**. A diff can honestly satisfy "is
+> there stale state here?" on the first `await` that looks fine and still carry nine
+> unread ones.
+
+The same asymmetry explains why the constructs layer under-performed: it is described as
+the grep layer, but nothing required the grep to *produce a list*. "Checked the async
+boundaries" and "enumerated eleven `await`s, nine safe, two candidates" are different
+acts that read identically in a report.
+
+**Patch — four enumerated sweeps (`SKILL.md`, Phase 3).** Post-await state, presence and
+absence, effect order, and test power. Each defines its population, requires a verdict
+per row, and reports an instance count in the run header. `post-await 0` on an async diff
+is now visibly a skipped sweep rather than a clean one, the same way the hunks-per-hour
+row made a skimmed pass visible. The falsification self-check asks whether each sweep
+produced a list or a conclusion.
+
+**Patch — test power as the fourth sweep.** For every test added or changed in the diff:
+revert the production hunk it covers, run it, and record whether it went red. Where
+reverting is impractical, name the assertion that would fail and the input that reaches
+it, and check the fixtures actually contain a case of the class under test — a setup
+filter that excludes every input the regression would produce is the recurring shape, and
+it reads as a passing test forever. The strongest catch in this whole window was exactly
+that: a test rewritten into a decoy, admitting only a subset that excluded the case the
+change existed to protect, on a diff the commercial reviewer had cleared twice. **A test
+that tests nothing is an absence** — there is no wrong line to annotate — so a
+diff-comment reviewer structurally cannot report it, and fixing it cannot move a
+findings-per-pull-request metric either. Which is the argument for measuring recall
+against a corpus and a tautology-detection rate instead of another tool's comment count.
+
+**Patch — a run record (`scripts/log_run.sh`).** One record per hunt appended to
+`.agent/shrike-log.md`, keyed on the head SHA: target, range, files/hunks, duration,
+sweep counts, candidates raised/killed/reported, and what was left unreviewed. Phase 7
+reads `--last` to find the commit the previous report covered without needing the pull
+request comment, and `report_stats.sh` falls back to it when `gh` is unavailable. Its
+second purpose is the one this study needed: escaped bugs become attributable at commit
+granularity instead of being reverse-engineered from transcripts.
+
+**Patch — the replaced code is the peer (Phase 1).** A rewrite inherits every constraint
+the old implementation encoded and restates none of them. One finding in the sample was a
+default that a sibling module's comments record as incompatible with the regional
+endpoint the rewrite advertises; another was a predicate a later migration had already
+tightened in the parallel function. Both are class E, both were one file read away, and
+the peer step said to look sideways at siblings without saying to look *backwards* at
+what the change replaces.
+
+### What the taxonomy actually lacked
+
+Eight clauses, all folded into existing classes; still eight classes.
+
+1. **G** — an effect emitted before its sink is initialized, or registered after its
+   only consumer has read: it silently no-ops. This is the entire "side effect that
+   never fires" cluster, and it is an ordering defect, not a missing-guard one.
+2. **F** — a done-marker latched on an attempt whose effect never landed, so nothing
+   retries it. The latch is what turns a dropped write into a permanent one.
+3. **F** — a batch whose result cannot express per-member outcome, so the caller stamps
+   every member done. Covers most of the "status written without verifying" cluster:
+   the callee skips rows and returns success, the caller marks the whole page delivered.
+4. **G** — a generation guard some writers never bump, or read fresh while the payload
+   it protects stays stale. Both directions defeat optimistic concurrency while looking
+   like they enforce it; the second is nastier, because the check passing is what
+   authorizes the stale write.
+5. **B** — the mirror of the truthiness shape: a bare null check counting `""`, `[]`, or
+   a half-filled record as filled. The class had presence-written-as-truthiness for
+   years; the inverse (absence written as null-only) is just as common and produces
+   confident empty output.
+6. **B** — a gate keyed on a lossy projection of what it guards, so an edit its summary
+   cannot describe reads as no edit.
+7. **E** — a field the reader keys on that its producers leave unset, so the fallback
+   becomes the norm. Merged into the silent-mismatch clause: same failure, one side
+   absent rather than misspelled.
+8. **A** — a budget or deadline measured from a start that includes work it was never
+   meant to cover.
+
+Widenings rather than clauses: a read-then-write needs *a write predicate carrying the
+state the decision was read from* (a compare-and-set, not just a transaction); an
+affordance can disagree with the server by **offering an exit the handler rejects**, not
+only by showing a button it refuses; and a clear or teardown sequenced *before* the bump
+that would drop in-flight writes belongs beside the generation-guard shape.
+
+Four construct rows were added, because these three families need a grep handle and not
+just a class: effect registration or sink write, a concurrency token read for a guard, a
+status or completion write, and a test changed in the same diff.
+
+**Stack references.** Flutter/Dart: invalidating an `autoDispose` provider something is
+already awaiting (the awaiter can hang with no error, and a `.timeout()` at the await
+site fails that await open while leaving the shared future pending, so a second await
+blocks again after the irreversible step in between); `AsyncValue.when` discarding
+retained data on a failed refresh; a context used after the navigation that removed its
+route — including the case where the change deleted an incidental `await` that was
+providing the ordering; route observers reading a name most routes never set; crash
+reports and custom keys emitted before the reporter's SDK is initialized, plus the latch
+that makes the loss permanent. TypeScript/Next: an ISO shape plus a non-`NaN` `Date` is
+not calendar validation; `||` on numeric edit defaults dropping a stored `0`; server
+props refreshed while local form state is not; a version column one writer never bumps.
+
+**Declined, recorded as declined.** A numeric answer routed through a free-text path,
+burning a per-session budget and a model round-trip where a sibling path already sent it
+structured: real, but it is a peer divergence the existing step covers, so it earns no
+shape. And expected pre-auth failures recorded as genuine errors by a lifecycle trigger
+wired without the precondition its original call site had: kept, but as a stack-reference
+instance rather than a class shape, since it is framework-flavoured.
+
+**Budget accounting, stated because the last study made it a control.**
+`seeds-and-slicing.md` entered this pass at 2,836 words — already 86 over the stated
+2,750 backstop, drifted there by the Phase 7 work, which is itself an argument for
+measuring before adding. It leaves at ~3,104: eight classes, 8–12 shape clauses each, no
+clause longer than ~33 words. The budget is now written as the two controls that actually
+bind — **12 clauses per class, each a phrase rather than a sentence** — with the
+per-class word figure (~175) derived from them and the total restated as a ~3,100
+backstop. A fifth rule was added above it: if the class already had the shape, the fix is
+not in that file at all; patch the workflow that failed to ask the question and add
+nothing. Two thirds of this study's misses resolve that way, and a file that grows on
+those is a file that will be skimmed.
