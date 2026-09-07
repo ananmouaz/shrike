@@ -2,10 +2,43 @@
 
 **A bug hunter for AI coding agents that would rather find nothing than waste your time.**
 
-New here? Start with [SETUP.md](SETUP.md).
-
 > A shrike is a small songbird that impales its prey on thorns and comes back for it
 > later. Seemed about right.
+
+## What a run looks like
+
+```
+## 🔪 Shrike — 1 finding — dark chrome fill eats photo shadows
+
+|                  |                                                       |
+|------------------|-------------------------------------------------------|
+| **Target**       | `fix/forced-dark-card-captures` · `3ecbfe0...bb7622b`  |
+| **Reviewed**     | 4 files, 31 hunks, 12 callers outside, 2 peers compared |
+| **Not reviewed** | none                                                   |
+| **Duration**     | 6m 12s — 300 hunks/hour                                |
+| **Seeds worked** | 19 constructs · classes A,C,D,H live (B,E,F,G n/a)     |
+| **Candidates**   | 9 raised → 8 killed in falsification → **1 reported**  |
+| **Findings**     | 🔴 0 critical · 🟠 0 high · 🟡 1 medium                 |
+```
+
+**The row that matters is `Candidates`.** Nine raised, eight killed, one survived. A
+tool that reports everything it thought of is not showing you its work — it's showing
+you its stream of consciousness.
+
+`Not reviewed` is the other honest row. A report is only true of the commit range in its
+header, so anything outside it — a slice too big to hunt at depth, commits pushed after
+the run, fixes the run itself applied — gets named instead of quietly counting as clean.
+
+The numbers are measured, not vibes. Duration is stamped at the start and computed at
+the end, because "took about 5 minutes" is exactly the kind of thing you shouldn't
+believe from a language model.
+
+Each finding then gives you: where, what triggers it, the traced path with line
+numbers, what a user actually experiences, the guard it checked for and didn't find,
+the minimal fix, and either a failing test or the one rebuttal it couldn't close.
+
+Same markdown goes to your terminal and to **one** PR comment that updates in place. No
+inline comment confetti.
 
 ## The problem
 
@@ -51,41 +84,6 @@ tries to prove itself wrong.
 7. **Hunt the diff you haven't reviewed** — the fixes the run just applied, and anything
    pushed since the commit the report covers. A reviewer that runs once loses to a bot
    that runs on every push, and it loses on coverage, not on reasoning.
-
-## What a run looks like
-
-```
-## 🔪 Shrike — 1 finding — dark chrome fill eats photo shadows
-
-|                  |                                                       |
-|------------------|-------------------------------------------------------|
-| **Target**       | `fix/forced-dark-card-captures` · `3ecbfe0...bb7622b`  |
-| **Reviewed**     | 4 files, 31 hunks, 12 callers outside, 2 peers compared |
-| **Not reviewed** | none                                                   |
-| **Duration**     | 6m 12s — 300 hunks/hour                                |
-| **Seeds worked** | 19 constructs · classes A,C,D,H live (B,E,F,G n/a)     |
-| **Candidates**   | 9 raised → 8 killed in falsification → **1 reported**  |
-| **Findings**     | 🔴 0 critical · 🟠 0 high · 🟡 1 medium                 |
-```
-
-**The row that matters is `Candidates`.** Nine raised, eight killed, one survived. A
-tool that reports everything it thought of is not showing you its work — it's showing
-you its stream of consciousness.
-
-`Not reviewed` is the other honest row. A report is only true of the commit range in its
-header, so anything outside it — a slice too big to hunt at depth, commits pushed after
-the run, fixes the run itself applied — gets named instead of quietly counting as clean.
-
-The numbers are measured, not vibes. Duration is stamped at the start and computed at
-the end, because "took about 5 minutes" is exactly the kind of thing you shouldn't
-believe from a language model.
-
-Each finding then gives you: where, what triggers it, the traced path with line
-numbers, what a user actually experiences, the guard it checked for and didn't find,
-the minimal fix, and either a failing test or the one rebuttal it couldn't close.
-
-Same markdown goes to your terminal and to **one** PR comment that updates in place. No
-inline comment confetti.
 
 ## "Zero findings" is a good day
 
@@ -174,15 +172,26 @@ it can run this.
 | `scripts/build_portable.sh` | Rebuilds `dist/` from `skills/` so the two don't drift |
 | `MISSES.md` | The ledger — every bug Shrike missed, why, and what changed as a result |
 
-`MISSES.md` is the interesting one. Shrike gets better by being told what it failed to
-catch, and the rule is that a miss must generalize into an existing class or it doesn't
-get added at all. Otherwise you wake up one day with a 200-row checklist.
+`MISSES.md` is the interesting one — see [the miss ledger](#the-miss-ledger) below.
 
 ---
 
 ## Install
 
-Two equivalent formats — pick what your agent eats:
+One command, any agent — installs `skills/shrike/` into whatever agent skill
+directories it finds in the project:
+
+```bash
+npx skills add ananmouaz/shrike                   # this project
+npx skills add ananmouaz/shrike -g                # every project on the machine
+npx skills add ananmouaz/shrike -a claude-code    # one agent only
+```
+
+This is also the channel that registers the skill on [skills.sh](https://www.skills.sh),
+so it's the one to prefer if you don't care which format lands.
+
+Longer route, if you'd rather wire it yourself — two equivalent formats, pick what your
+agent eats:
 
 - `skills/shrike/` — Agent Skills format. Cheapest on context, loads references only
   when needed.
@@ -196,6 +205,8 @@ Two equivalent formats — pick what your agent eats:
 | Gemini CLI | Append the `AGENTS.md` pointer to `GEMINI.md`, same prompt file |
 | Aider / Cline / Continue | Point the conventions or rules file at `shrike.prompt.md` |
 | Raw API | Send `dist/shrike.flat.md` as the system prompt. Needs file-read + shell tools. |
+
+Longer walkthrough of each of these: [SETUP.md](SETUP.md).
 
 ### Skill-loader agents: clone instead
 
@@ -321,6 +332,19 @@ findings when something violates them:
 Commit it. It compounds.
 
 ---
+
+## The miss ledger
+
+[MISSES.md](MISSES.md) is the list of bugs Shrike **failed** to find. Every entry records
+the shape of the miss, which of the eight classes now absorbs it, and the patch that
+closed it. No other reviewer publishes this, which is exactly why it's worth reading
+before you trust the precision claims above.
+
+It's also the thing that keeps the method from rotting. The rule is **generalize or
+don't add**: a miss has to fold into an existing class as one more shape, or prove it's a
+new *kind* of wrongness — not a new situation. Anything that can't do either gets no
+entry. That's what stops a bug ledger from turning into the 200-row checklist this whole
+tool exists to avoid.
 
 ## Does it actually work?
 
