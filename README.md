@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
+  <img src="assets/logo.png" alt="" align="right" width="104">
+</picture>
+
 # Shrike
 
 **A bug hunter for AI coding agents that would rather find nothing than waste your time.**
@@ -170,6 +175,7 @@ it can run this.
 | `templates/` | Starter `review-rules.md` and a GitHub Actions workflow |
 | `skills/shrike/scripts/` | The deterministic bits: analyzer pass, measured report stats, PR-comment upsert, run log |
 | `scripts/build_portable.sh` | Rebuilds `dist/` from `skills/` so the two don't drift |
+| `assets/` | Logo, README illustration, social-preview card |
 | `MISSES.md` | The ledger — every bug Shrike missed, why, and what changed as a result |
 
 `MISSES.md` is the interesting one — see [the miss ledger](#the-miss-ledger) below.
@@ -334,6 +340,11 @@ Commit it. It compounds.
 ---
 
 ## The miss ledger
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/header-dark.png">
+  <img src="assets/header.png" alt="A shrike, and one beetle, on a thorn branch" align="right" width="330">
+</picture>
 
 [MISSES.md](MISSES.md) is the list of bugs Shrike **failed** to find. Every entry records
 the shape of the miss, which of the eight classes now absorbs it, and the patch that
