@@ -193,8 +193,9 @@ npx skills add ananmouaz/shrike -g                # every project on the machine
 npx skills add ananmouaz/shrike -a claude-code    # one agent only
 ```
 
-This is also the channel that registers the skill on [skills.sh](https://www.skills.sh),
-so it's the one to prefer if you don't care which format lands.
+This is also the channel that gets the skill
+[listed on skills.sh](https://www.skills.sh/ananmouaz/shrike/shrike), so it's the one to
+prefer if you don't care which format lands.
 
 Longer route, if you'd rather wire it yourself — two equivalent formats, pick what your
 agent eats:
