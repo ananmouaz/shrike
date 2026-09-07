@@ -379,3 +379,7 @@ And keep the receipts. `scripts/log_run.sh` appends one record per run keyed on 
 SHA — without it, "was this commit reviewed?" is answered by digging through transcripts,
 and a finding on a reviewed *pull request* can't be told apart from a finding on code
 pushed after the report. Those are different failures with different fixes.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
