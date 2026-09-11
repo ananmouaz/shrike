@@ -173,7 +173,7 @@ it can run this.
 | `adapters/` | Drop-in wiring for `AGENTS.md`-convention agents |
 | `commands/` | `/shrike-review` slash command for Claude Code |
 | `templates/` | Starter `review-rules.md` and a GitHub Actions workflow |
-| `skills/shrike/scripts/` | The deterministic bits: analyzer pass, measured report stats, PR-comment upsert, run log |
+| `skills/shrike/scripts/` | The deterministic bits: analyzer pass, measured report stats, PR-comment upsert that also writes the JSONL run record |
 | `scripts/build_portable.sh` | Rebuilds `dist/` from `skills/` so the two don't drift |
 | `assets/` | Logo, README illustration, social-preview card |
 | `MISSES.md` | The ledger — every bug Shrike missed, why, and what changed as a result |
@@ -375,10 +375,18 @@ test that tests nothing is an absence with no line to comment on. Measure instea
 dismissal rate per run, recall against your own list of bugs that escaped, and how often
 a changed test survives having its production hunk reverted.
 
-And keep the receipts. `scripts/log_run.sh` appends one record per run keyed on the head
-SHA — without it, "was this commit reviewed?" is answered by digging through transcripts,
-and a finding on a reviewed *pull request* can't be told apart from a finding on code
-pushed after the report. Those are different failures with different fixes.
+And keep the receipts. Every run appends one JSON line — repo, branch, head SHA, the
+candidate and sweep counts, what was left unreviewed — to a machine-local
+`~/.local/state/shrike/runs.jsonl`, written from the report itself before it is posted.
+Without it, "was this commit reviewed?" is answered by digging through transcripts, and a
+finding on a reviewed *pull request* can't be told apart from a finding on code pushed
+after the report. Those are different failures with different fixes. `jq` answers the
+question in one line:
+
+```bash
+jq -r 'select(.repo=="owner/name") | [.ts,.branch,.head[0:8],.candidates,.killed,.reported] | @tsv' \
+   ~/.local/state/shrike/runs.jsonl
+```
 
 ## License
 

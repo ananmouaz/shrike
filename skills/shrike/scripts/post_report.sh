@@ -1,8 +1,15 @@
 #!/usr/bin/env bash
-# Phase 6: post the report to a pull request as ONE comment.
+# Phase 6: record the run, then post the report to a pull request as ONE comment.
 #
 # Upserts: finds the previous Shrike comment by its hidden marker and edits it in
 # place, so re-running on a new push replaces the report instead of stacking copies.
+#
+# Records first: the report already carries every number the run record needs, so this
+# script hands it to log_run.sh before posting. If the record cannot be written — the
+# header lacks a Candidates row, the log path is not writable — nothing is posted and
+# the exit status is 1. A report is not allowed to exist without its record; without
+# one, "was this commit hunted?" is unanswerable later. A re-post of an unchanged
+# report is recognised by log_run.sh and does not create a second record.
 #
 # Usage: post_report.sh <pr-number> <report.md>
 #        post_report.sh 142 /tmp/shrike-report.md
@@ -28,6 +35,15 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 2
 fi
 
+# --- 1. the record ------------------------------------------------------------
+LOGGER="$(dirname "$0")/log_run.sh"
+if ! "$LOGGER" --pr "$PR" --report "$FILE"; then
+  echo "post_report.sh: refusing to post — the run was not recorded (see log_run.sh above)." >&2
+  echo "Fix the run header (Candidates row: 'N raised → N killed … → **N reported**') and re-run." >&2
+  exit 1
+fi
+
+# --- 2. the comment -----------------------------------------------------------
 REPO="${GH_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}"
 
 REVIEWED_HEAD=$(git rev-parse HEAD 2>/dev/null || echo "unknown")

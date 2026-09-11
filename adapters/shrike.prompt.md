@@ -45,6 +45,14 @@ wrong," it is not a finding. Delete it.
 ## Execute these phases in order. Write each phase's output to a file before starting
 ## the next one. Do not emit any finding before Phase 5.
 
+**Run shape.** A hunt is latency-bound on tool round-trips, not on reasoning. Issue
+independent tool calls together in one message — the five sweep greps in Phase 3, the
+one-grep-per-symbol caller search in Phase 1, the second-site file opens in Phase 2, the
+rebuttal reads in Phase 4 — and serialise only where one call's input is another's
+output. A round after the first hunts only the delta since the last recorded head, and
+the loop stops after `SHRIKE_MAX_ROUNDS` rounds (default 3) with what is still open
+named in the report (Phase 7).
+
 ### Phase 0 — Deterministic pass → `.shrike/0-tools.txt`
 
 **Stamp the start time first** — the report states how long the hunt took, and that is
@@ -207,6 +215,18 @@ tool call); `abortSignal` omitted on nested repair/fallback calls, which keep ru
 and billing after cancel; a fallback fanning out per-item requests after the batch call
 already exhausted its rate-limit retries; stale or non-date-aware per-token pricing
 constants; tool-call arguments trusted as valid schema without a parse step.
+**Second site — required before Phase 3 starts on any row.** For every guard, writer,
+or predicate the diff touches, write down the other participant as a pair of locations,
+`path:line ↔ path:line`, or `none:` plus what you searched: a write whose decision came
+from an earlier read → the second writer of that row or key; a local copy seeded from a
+source → the source and its resync; a predicate tightened, loosened, merged, or replaced
+→ every other implementation of the rule, whole repo; a loop that skips inside a
+scalar-returning function → the caller acting on the whole set; a deadline or budget →
+the work before its clock starts; a guard on a supplied value → the producer that
+decides what "absent" is. The pairs are sweep 5's population and Phase 4's rebuttal set;
+a candidate with a blank pair cannot be falsified, and a clearance with a blank pair was
+cleared in isolation. Open the paired files in one batch.
+
 ### Phase 3 — Trace each seed → `.shrike/3-candidates.md`
 
 Resolve each seed's question by **reading actual code**, not by reasoning about what
@@ -228,20 +248,25 @@ question asked of the whole change, and one answer closes it — the right shape
 semantic question, the wrong shape for five families where the defect is *per instance*.
 A diff can honestly satisfy "is there stale state here?" on the first `await` that looks
 fine and still carry nine unread ones. So build the instance list, put a verdict on every
-row, and report the counts. A sweep reported without its list was not run.
+row, and report the counts. A sweep reported without its list was not run. Build all five
+populations in one message — the greps share nothing.
 
 1. **Post-await state** — every `await` in the changed files whose enclosing function
    afterwards touches something captured before it (a local, an instance field, a
    `ref`/context/store handle, `mounted`, a row a decision was read from). Per row: what
    was captured, what can change it while the await is open, and the re-read, currency
    check, or guard that makes the later use safe. Watch for the partial case — the diff
-   adds the guard at one such read and leaves its sibling three lines down.
+   adds the guard at one such read and leaves its sibling three lines down. The
+   population stops at the enclosing function; a second actor writing the same row with
+   no `await` open is sweep 5's first row kind, and this sweep cannot see it.
 2. **Presence and absence** — every guard deciding whether a value was supplied
    (`if (x)`, `x || d`, `x ?? d`, `!= null`, `.isEmpty`, `= false`, an edit form's
    prefilled defaults). Per row: name the legal values that take the absent branch (`0`,
    `""`, `false`, `[]`, a record with some fields filled) and which of them real input
    can produce. A stored `0` on an edit path and a whitespace-only string from an
-   extractor are the two that recur.
+   extractor are the two that recur. Include the "is there a local value?" test on an
+   optimistic override map — a legitimate `0`, `""`, or `false` erases the server value;
+   that row is also sweep 5's local-copy kind, on purpose.
 3. **Effect order** — every registration, subscription, observer, custom key, or report
    in the diff. Per row: is the sink initialized at that line, and where does its only
    consumer read? Both orderings fail silently — emitted before the sink exists, or
@@ -296,8 +321,11 @@ time.
 ceremony — re-reading your candidates as text, rather than continuing from memory,
 is what makes the change of stance real.
 
-Now you are a hostile senior reviewer whose job is to **destroy each candidate**. For
-each one, generate the strongest rebuttal, then go read the code that would contain it:
+Now you are a hostile senior reviewer whose job is to **destroy each candidate**. A
+candidate enters with its second-site pair filled in or it does not enter — the other
+participant is where the rebuttal lives, and where the confirmation lives. For each one,
+generate the strongest rebuttal, then go read the code that would contain it (all the
+rebuttal reads in one batch):
 
 - Guarded upstream by a caller, middleware, validator, or schema parse
 - Made unrepresentable by the type system
@@ -404,22 +432,31 @@ else gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@body.md; fi
 ```
 
 The `shrike-head` stamp records which commit the report covers, so the next run can diff
-what has landed since. **Record the run locally too** — nothing else leaves a trace that
-a hunt happened, so coverage cannot be measured and the next run cannot know which commit
-was already hunted:
+what has landed since. **Record the run before posting or printing** — the report does
+not exist until its record does. One JSON line per run, in a machine-local file outside
+every repo (a record inside a worktree dies with it; a tracked log conflicts on every
+rebase), keyed on repo + branch + head SHA:
 
 ```bash
-mkdir -p .agent && cat >> .agent/shrike-log.md <<EOF
-## $(date -u +%Y-%m-%dT%H:%M:%SZ) — ${TARGET:-$(git rev-parse --abbrev-ref HEAD)}
-- head=\`$(git rev-parse HEAD)\` branch=\`$(git rev-parse --abbrev-ref HEAD)\`
-- sweeps: post-await N · presence N · effect-order N · second-site N · tests N/N
-- candidates: N raised → N killed → N reported
-- unreviewed: <what you did not hunt, or none>
-EOF
+LOG="${SHRIKE_LOG:-${XDG_STATE_HOME:-$HOME/.local/state}/shrike/runs.jsonl}"; mkdir -p "$(dirname "$LOG")"
+jq -nc --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --arg repo "$(git remote get-url origin | sed -E 's#\.git$##; s#^.*[:/]([^/]+/[^/]+)$#\1#')" \
+  --arg branch "$(git rev-parse --abbrev-ref HEAD)" --arg head "$(git rev-parse HEAD)" \
+  --arg base "$(git rev-parse "$BASE")" --argjson pr "${PR:-null}" \
+  --argjson files N --argjson hunks N --argjson secs N --argjson round N \
+  --argjson candidates N --argjson killed N --argjson reported N \
+  --argjson severity '{"critical":N,"high":N,"medium":N}' \
+  --argjson sweeps '{"post_await":N,"presence":N,"effect_order":N,"second_site":N,"tests_run":N,"tests_red":N}' \
+  --arg unreviewed "<what you did not hunt, or none>" \
+  '$ARGS.named' >> "$LOG"
 ```
 
-Keyed on the head SHA, because a record against a *pull request* cannot tell a genuine
-miss from a bug in code pushed after the report — and those have different fixes.
+Every `N` is a number from the run header — the same numbers, not new ones. If any of
+`candidates`, `killed`, `reported` is unknown, the header is not ready and neither is
+the report. Keyed on the head SHA because a record against a *pull request* cannot tell
+a genuine miss from a bug in code pushed after the report — and those have different
+fixes. Round N reads the previous record's `head` for this repo and branch from the same
+file.
 
 Close with **Checked and cleared** — 3–6 things you specifically investigated and ruled
 out, with reasons. This is what makes a zero-finding run trustworthy rather than lazy.
@@ -444,6 +481,19 @@ the old one is class H, and it is yours.
 --stat`; if it is non-empty, hunt that delta at the same depth and update the comment.
 The same holds for a rollup or integration pull request: it is a distinct diff against a
 distinct base, and reviewing each contributing branch is not reviewing their merge.
+
+**A round after the first is scoped to that delta.** Round N hunts `<head the last
+record covers>..HEAD` plus the working tree: callers of the symbols the delta changes,
+second-site pairs and the five sweeps over the delta's hunks, falsification over the new
+candidates. A row an earlier round cleared is reopened only when the delta touches its
+lines or its second site. Say so in the header: `round 2: 2 commits, 9 hunks since
+round 1`.
+
+**The loop is bounded.** At most `SHRIKE_MAX_ROUNDS` rounds (default 3). At the cap,
+stop, and make the report say what is open: the *Not reviewed* row names any delta not
+hunted, and an **Open** list under the findings names each surviving candidate not yet
+fixed. The caller decides whether to spend another round. "Repeat until zero findings"
+is not a stopping condition.
 
 Whatever stays unreviewed, name it in the report. Silence reads as coverage.
 

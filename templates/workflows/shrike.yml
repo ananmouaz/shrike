@@ -95,12 +95,30 @@ jobs:
               .claude/skills/shrike/scripts/post_report.sh ${{ github.event.pull_request.number || github.event.issue.number }} /tmp/shrike-report.md
 
             That script upserts by a hidden marker, so a re-run on a new push replaces
-            the previous report instead of stacking copies. Do not post inline review
+            the previous report instead of stacking copies. It also writes the run
+            record (one JSON line to $SHRIKE_LOG) before posting, and refuses to post
+            if the run header is missing its Candidates row. Do not post inline review
             comments — one comment keeps the signal concentrated. If nothing survives
             the evidence bar, post the short zero-findings report with the run header
             and the "Checked and cleared" list. Do not pad it.
+
+            Issue independent tool calls together in one message — the five sweep
+            greps, the per-symbol caller greps, the second-site file opens. The run is
+            latency-bound on round-trips, and this job has a 20-minute budget.
           claude_args: |
             --allowedTools "Bash,Read,Glob,Grep,Edit,Write"
             --max-turns 60
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The runner is thrown away; keep the record as an artifact so coverage can
+          # still be measured per commit later.
+          SHRIKE_LOG: ${{ github.workspace }}/.shrike-runs.jsonl
+
+      - name: Keep the run record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shrike-run-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.run_id }}
+          path: ${{ github.workspace }}/.shrike-runs.jsonl
+          if-no-files-found: ignore
+          retention-days: 90

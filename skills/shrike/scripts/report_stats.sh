@@ -7,7 +7,11 @@
 #        base-ref defaults to the merge-base with main/master.
 #        last-reviewed-sha defaults to the `shrike-head` stamp on the pull request's
 #        existing Shrike comment when SHRIKE_PR is set and gh is available, and falls
-#        back to the last head SHA `log_run.sh` recorded for this branch.
+#        back to the last head SHA `log_run.sh` recorded for this repo and branch.
+#
+# Also prints the round number (records already logged for this branch, plus one) and
+# the cap it is measured against (SHRIKE_MAX_ROUNDS, default 3). A round after the
+# first hunts only `since` — the delta from the last recorded head — not the branch.
 
 set -uo pipefail
 
@@ -81,9 +85,21 @@ if [ -z "$LAST" ] && [ -n "${SHRIKE_PR:-}" ] && command -v gh >/dev/null 2>&1; t
 fi
 
 # No pull request, no gh, or no previous comment: the run log is the local record.
-if [ -z "$LAST" ]; then
-  LOGGER="$(dirname "$0")/log_run.sh"
-  [ -x "$LOGGER" ] && LAST=$("$LOGGER" --last 2>/dev/null | tr -dc '0-9a-f')
+LOGGER="$(dirname "$0")/log_run.sh"
+if [ -z "$LAST" ] && [ -x "$LOGGER" ]; then
+  LAST=$("$LOGGER" --last 2>/dev/null | tr -dc '0-9a-f')
+fi
+
+# --- which round this is, against the cap (Phase 7 loop) ---
+MAX_ROUNDS="${SHRIKE_MAX_ROUNDS:-3}"
+ROUND="?"
+if [ -x "$LOGGER" ]; then
+  PRIOR=$("$LOGGER" --rounds 2>/dev/null | tr -dc '0-9')
+  ROUND=$(( ${PRIOR:-0} + 1 ))
+fi
+ROUND_NOTE=""
+if [ "$ROUND" != "?" ] && [ "$ROUND" -gt "$MAX_ROUNDS" ] 2>/dev/null; then
+  ROUND_NOTE=" — OVER THE CAP: report what is still open and hand back to the caller"
 fi
 
 DELTA="none — no previous report or run record for this branch"
@@ -107,9 +123,17 @@ echo "range:     $RANGE"
 echo "files:     $FILES"
 echo "hunks:     $HUNKS"
 echo "since:     $DELTA"
+echo "round:     $ROUND of $MAX_ROUNDS$ROUND_NOTE"
+[ -x "$LOGGER" ] && echo "log:       $("$LOGGER" --path 2>/dev/null)"
 echo
 echo "Fill the remaining header rows yourself — callers read outside the diff, peers"
 echo "compared against it, which invariant classes were live and what you searched for"
 echo "the ones you called n/a, the per-instance sweep counts, the candidates"
 echo "raised/killed/reported counts, and any slice you left unhunted. Report them"
-echo "honestly; do not round them in your favour. Then log the run: log_run.sh."
+echo "honestly; do not round them in your favour."
+echo
+echo "The record is written from the report: post_report.sh does it before posting, and"
+echo "refuses to post if it fails. For a run with no pull request, run"
+echo "  log_run.sh --report <report.md>"
+echo "yourself before printing the report; a non-zero exit means the header is missing"
+echo "its Candidates row and the report is not ready."

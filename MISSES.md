@@ -503,7 +503,8 @@ findings-per-pull-request metric either. Which is the argument for measuring rec
 against a corpus and a tautology-detection rate instead of another tool's comment count.
 
 **Patch — a run record (`scripts/log_run.sh`).** One record per hunt appended to
-`.agent/shrike-log.md`, keyed on the head SHA: target, range, files/hunks, duration,
+`.agent/shrike-log.md` (since moved out of the repo, as JSONL — see Study 6c), keyed on
+the head SHA: target, range, files/hunks, duration,
 sweep counts, candidates raised/killed/reported, and what was left unreviewed. Phase 7
 reads `--last` to find the commit the previous report covered without needing the pull
 request comment, and `report_stats.sh` falls back to it when `gh` is unavailable. Its
@@ -679,6 +680,51 @@ with diff size, which Study 5 established. Measure **High-severity findings per 
 pull request**. Baseline: 0.28, statistically identical to the 0.27 on unhunted pull
 requests. Retire the bot only after roughly twenty consecutive hunted pull requests at
 zero.
+
+**Patch, second pass — the join made a required step, not only a sweep.** The sweep
+above enumerates the pairs; nothing yet forced the pairs to exist before falsification
+started. Phase 2 now has a third required step: for every guard, writer, or predicate the
+diff touches, write the other participant as a pair of locations, or `none:` plus what was
+searched. Phase 3 does not start on a row without its pair, and Phase 4 does not admit a
+candidate without one — the other participant is where the rebuttal lives, and where the
+confirmation lives. Sweeps 1 and 2 each gained one sentence stating their boundary
+against the new sweep: sweep 1's population stops at the enclosing function, so the
+second-actor case is sweep 5's and not its own; sweep 2's population includes the
+truthiness test on an optimistic override map, which is also sweep 5's local-copy kind,
+on purpose. Nothing was added for the sink-order escape — that clause already existed.
+
+**Study 6b — what a run costs, and why that is a recall number.** Sixty-four real runs:
+median 7.1 minutes, mean 8.4, p90 14.0, max 26.3. Median 25 tool calls per run at a
+median 15 seconds each, and 1.00 tool-use blocks per assistant message — every one of
+6,088 calls went out alone. The runs were latency-bound on serial round-trips, not on
+compute. On the same repository one diff was hunted thirteen rounds, each re-reading
+what the last had cleared, under a "repeat until zero findings" instruction with no
+end. A hunt people skip because it is slow has a recall of zero on the pull requests
+it skipped, so cost is a recall lever. Three patches to the workflow, none touching the
+evidence bar: independent tool calls — the five sweep greps, the per-symbol caller greps,
+the second-site opens, the rebuttal reads — go out together in one message; a round after
+the first is scoped to `<last recorded head>..HEAD`, reopening a cleared row only when
+the delta touches its lines or its second site; and the loop is capped at
+`SHRIKE_MAX_ROUNDS` (default 3), after which the report names what is still open and the
+caller decides. The shape is a bounded poll: N attempts, then a verdict.
+
+**Study 6c — the run record was unusable, and mostly absent.** The record was markdown
+appended to a file inside the repository under review. Three consequences, all
+observed: a record written in a worktree died with the worktree (one real run, eleven
+candidates and three reported, never reached the default branch); an append-only tracked
+file written from many branches conflicted on every rebase, and `merge=union`, tried as a
+fix, silently deleted record lines; and prose could not be queried, so "did hunting
+reduce escaped bugs" cost a grep over 250 session transcripts. Of 137 runs, 125 left no
+record at all, because recording was a separate optional step after the report. Patch:
+`log_run.sh` writes one JSON object per run — `ts repo branch pr head base range
+prev_head files hunks secs round candidates killed reported severity{} sweeps{}
+unreviewed` — to a machine-local `${XDG_STATE_HOME:-~/.local/state}/shrike/runs.jsonl`,
+outside every repo; `--last` resolves per repo *and* branch, since one file now holds
+many of both. The record is written from the report: `post_report.sh` hands the report to
+`log_run.sh` before posting and refuses to post when the record fails, and a record whose
+three candidate numbers are missing is refused. The report cannot exist without its
+record, which is the only form of "make it automatic" that survived contact with 125
+skipped optional steps.
 
 **Budget accounting.** `seeds-and-slicing.md` entered at 3,104 words, already at the
 backstop. Class C was at twelve clauses, so its first two — state captured before an

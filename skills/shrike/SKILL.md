@@ -62,6 +62,28 @@ this"*.
 
 Run these phases in order. Do not emit any finding before Phase 5.
 
+### Run shape — the cost of a run, and the three rules that halve it
+
+Measured over real runs, a hunt is latency-bound on tool round-trips, not on
+reasoning: the median run made about 25 tool calls at about 15 seconds each, and every
+one of them went out alone, one call per message. A run that people skip because it is
+slow has a recall of zero, so cost is a recall problem. Three rules, none of which
+touches the evidence bar:
+
+1. **Independent tool calls go out together, in one message.** The sweep greps in
+   Phase 3 read the same diff and do not depend on each other: issue all five as
+   parallel tool calls in a single message and read the results together. The same
+   holds for the analyzer runs in Phase 0, the caller greps in Phase 1 (one per changed
+   symbol), the file opens for the second-site pairs in Phase 2, and the rebuttal reads
+   in Phase 4. Serialise only where one call's input is another call's output.
+2. **A round after the first hunts the delta, not the branch.** Round N is scoped to
+   `<head the last record covers>..HEAD` — see Phase 7. Round 2 re-reading everything
+   round 1 cleared is how one diff came to be hunted thirteen times.
+3. **The loop is bounded.** At most `SHRIKE_MAX_ROUNDS` rounds (default 3), then the
+   report names what is still open and the caller decides — see Phase 7. "Repeat until
+   zero findings" has no end, and a hunt that has once run unbounded does not get
+   started the next time.
+
 ### Phase 0 — Deterministic pass first
 
 **Record the start time before anything else** — the report states how long the hunt
@@ -80,7 +102,8 @@ scripts/static_pass.sh [path]
 
 This runs whatever the repo has (`dart analyze`, `tsc --noEmit`, `eslint`, `go vet`,
 `cargo check`, `ruff`, `semgrep`) and collects results. Also run the existing test
-suite if it is fast enough to be practical.
+suite if it is fast enough to be practical — in the same message as the analyzer pass,
+since neither waits on the other.
 
 Use these results two ways: as **findings you no longer need to hunt for** (a type
 error is the compiler's job, not yours), and as **signal about where the change is
@@ -103,7 +126,8 @@ Read to establish, in your own words, before hypothesizing:
 Then, for every symbol whose contract changed, **find every caller**. This is the
 single highest-yield step in the whole workflow: the most valuable bugs are almost
 never inside the diff. They are in the code that was written against the old
-behavior and was not updated. Use grep/ripgrep or an LSP; read the call sites.
+behavior and was not updated. Use grep/ripgrep or an LSP; read the call sites. One grep
+per changed symbol, all of them in one message — they share nothing.
 
 **Then find the peer and read it.** Almost nothing in a mature repo is the first of its
 kind. For each behavior the change introduces, name the nearest thing already doing
@@ -149,6 +173,29 @@ its two layers, which do different jobs:
    class's question of the change as a whole. This layer catches what no construct
    greps for, and it is capped at eight on purpose: eight questions get worked, forty
    get skimmed.
+
+3. **Second site — required, and Phase 3 does not start on a row without it.** The
+   two layers above ask *what is wrong here*. This step asks *what here depends on
+   something that did not change*. For every guard, writer, or predicate the diff
+   touches, name the other participant, as a pair of locations — `path:line ↔
+   path:line` — or as `none:` followed by what you searched to establish that:
+   - a **write** whose value or decision came from an earlier read → the *second
+     writer* of that row or key (another request, admin, isolate, queued callback);
+   - a **local copy** seeded from a source → the *source* and the resync that follows
+     it;
+   - a **predicate, validator, or rule** tightened, loosened, merged, or replaced →
+     every *other implementation* of the same rule, whole repo, not diff;
+   - a **loop that skips** inside a function returning a scalar → the *caller* that
+     acts on the whole set after the return;
+   - a **deadline or budget** → the *work that runs before its clock starts*;
+   - a **guard** on a supplied value → the *producer* that decides what "absent" is.
+
+   The pairs are the population sweep 5 enumerates, and they are the rebuttal set for
+   Phase 4: a candidate whose pair is blank cannot be falsified, only argued about, and
+   a clearance whose pair is blank was cleared in isolation. In one study twelve of
+   thirteen escaped High findings named two or three locations; every sweep drew its
+   population from the diff, so the second location was never opened. Open the files
+   in one batch — the pairs are independent.
 
 Note in your Phase 2 output which classes are *live* for this change and which are
 not applicable — the report cites them, and a class you never asked is a gap you
@@ -199,7 +246,9 @@ first instance that looks fine. So work them as **enumerations** — build the i
 list, put a verdict on every row, and carry the counts into the report header. A sweep
 reported without its instance list was not run. Each has a construct row in
 `references/seeds-and-slicing.md` stating its question; what follows is the population
-to enumerate and what a row has to say.
+to enumerate and what a row has to say. **Build all five populations in one message**:
+the greps read the same diff and share nothing, so five parallel tool calls cost one
+round-trip, not five.
 
 1. **Post-await state.** Population: every `await` in the changed files whose enclosing
    function afterwards touches something captured before it — a local, an instance
@@ -211,13 +260,18 @@ to enumerate and what a row has to say.
    sibling three lines down. For an index, the population also includes positions held
    across a refetch, a filter change, or an open sheet or dialog, not only an `await`:
    settling a row so it drops out of the default filter reorders the list under the
-   handle, and the handle must then be a stable id.
+   handle, and the handle must then be a stable id. The population stops at the
+   enclosing function: a second actor writing the same row while no `await` is open is
+   the first row kind of sweep 5, not this sweep — this one cannot see it.
 2. **Presence and absence.** Population: every guard in the diff deciding whether a
    value was supplied — `if (x)`, `x || d`, `x ?? d`, `!= null`, `.isEmpty`, `= false`,
    the defaults an edit form prefills. Per row: name the legal values that take the
    absent branch (`0`, `""`, `false`, `[]`, a record with some fields filled) and say
    which of them real input can produce. A stored `0` on an edit path and a
-   whitespace-only string from an extractor are the two that recur.
+   whitespace-only string from an extractor are the two that recur. The population
+   includes the "is there a local value?" test on an optimistic override map: a
+   legitimate `0`, `""`, or `false` in the overlay erases the server value. That row
+   is also the second row kind of sweep 5, and it appears in both lists on purpose.
 3. **Effect order.** Population: every registration, subscription, observer, custom
    key, or report emitted in the diff. Per row: is the sink initialized at that line,
    and where does its only consumer read? Both orderings fail silently — emitted before
@@ -233,10 +287,10 @@ to enumerate and what a row has to say.
    would produce is the usual shape, and it reads as a passing test forever.
 5. **Second site.** The escaped bugs that hurt most name two locations, not one: a
    changed line and an unchanged one it depends on. Sweeps 1–4 draw their populations
-   from the diff alone; this one pairs every row with code outside it, and a row is
-   not closed until the other participant has been opened and read. A name, a comment
-   asserting the two agree, or a helper that sounds equivalent is not evidence. Five
-   kinds of row:
+   from the diff alone; this one works the pairs Phase 2 step 3 wrote down, and a row
+   is not closed until the other participant has been opened and read. A name, a
+   comment asserting the two agree, or a helper that sounds equivalent is not evidence.
+   Five kinds of row:
    - **A write whose value, or whose decision to write, came from an earlier read** —
      SQL `UPDATE`/`DELETE`, a store or cache write, a file write, a set into shared
      state. The read and the write may sit in one synchronous block; the second writer
@@ -295,6 +349,13 @@ actively search for the thing that makes it wrong:
 Read `references/falsification.md` for the standard rebuttals and for the list of
 finding classes that are hallucination-prone and require extra evidence.
 
+**A candidate enters this phase with its second-site pair filled in, or it does not
+enter.** The other participant is where the rebuttal lives — the `WHERE` that repeats
+the predicate, the effect that resyncs the copy, the sibling already tightened — and it
+is also where the confirmation lives. If the pair from Phase 2 is blank, go back and
+name it; do not falsify against the diff alone. Read the rebuttal files for all
+candidates in one batch.
+
 **Kill rule:** if you cannot rule out the rebuttal by pointing at code, the finding
 dies. Not "downgraded" — deleted. Do not report it with a hedge.
 
@@ -348,25 +409,32 @@ scripts/post_report.sh <pr-number> <report.md>    # upserts, never duplicates
 One comment per PR, updated in place on re-runs. Never post inline review comments:
 the whole point is one concentrated signal the human will actually read.
 
-**Then record the run.** Nothing else in this workflow leaves a trace that it ran, and
-without one, coverage cannot be measured and the next run cannot know which commit was
-already hunted:
+**The record is written from the report, and the report does not exist until the
+record does.** `post_report.sh` hands the report to `log_run.sh` before it posts and
+refuses to post if the record fails. A run with no pull request writes the record
+itself, before printing:
 
 ```bash
-scripts/log_run.sh --pr <pr> --candidates 14 --killed 12 --reported 2 \
-                   --findings "1 high, 1 medium" --unreviewed none \
-                   --sweeps "post-await 9 · presence 4 · effect-order 2 · second-site 6 · tests 2/2"
+scripts/log_run.sh --report /tmp/shrike-report.md    # exit 1 → the header is not ready
 ```
 
-It appends one line per run to `.agent/shrike-log.md` (override with `SHRIKE_LOG`),
-keyed on the **head SHA** — target, base...head, files/hunks, duration, sweep counts,
-candidates raised/killed/reported, and whatever was left unreviewed. Two things depend
-on it: Phase 7 reads `scripts/log_run.sh --last` to find the commit the previous report
-covered without needing the PR comment, and a later question of the form "did reviewing
-actually reduce escaped bugs" is answerable at commit granularity instead of being
-reconstructed from transcripts. Reconstructed attribution is why that question usually
-comes back inconclusive: a run recorded against a *pull request* cannot tell a genuine
-miss from a bug in code pushed after the report.
+`log_run.sh` reads the numbers out of the run header — candidates raised, killed,
+reported; the severity counts; the per-sweep counts; the *Not reviewed* row; the target
+— and appends one JSON object per run to a **machine-local** file:
+`${XDG_STATE_HOME:-~/.local/state}/shrike/runs.jsonl` (override with `SHRIKE_LOG`).
+Fields: `ts repo branch pr head base range prev_head files hunks secs round candidates
+killed reported severity{} sweeps{} unreviewed`. One file per machine, outside every
+repo, because a record inside a worktree died with the worktree and an append-only
+tracked file conflicted on every rebase. A record without its three candidate numbers is
+refused, which is the whole gate: in one study 125 of 137 runs left no record at all,
+and answering "did hunting reduce escaped bugs" took a grep over 250 transcripts.
+
+Two things read it: Phase 7 asks `scripts/log_run.sh --last` for the commit the previous
+round on *this repo and this branch* covered, and any later eval joins each record's
+`head` to the bugs found afterwards at commit granularity. That join is why the question
+"did reviewing reduce escaped bugs" usually comes back inconclusive when it is
+reconstructed from pull requests: a run recorded against a *pull request* cannot tell a
+genuine miss from a bug in code pushed after the report.
 
 ### Phase 7 — the diff you did not review
 
@@ -398,6 +466,28 @@ understanding is already loaded. The same holds for a rollup or integration pull
 request: it is a distinct diff against a distinct base, and reviewing each contributing
 branch is not reviewing their merge.
 
+**A round after the first is scoped to that delta, not to the branch.** Round 1 hunted
+`<base>...<head₁>`. Round N hunts `<head the last record covers>..HEAD` plus the working
+tree — the range `report_stats.sh` prints as `since`. Re-run Phase 1's caller
+enumeration for every symbol the delta changes, Phase 2's pairs and the five sweeps over
+the delta's hunks, and falsification over the new candidates. A row an earlier round
+cleared is reopened only when the delta touches its lines or its second site; everything
+else keeps the verdict it already has, and the header says so: `Reviewed
+abc1234..def5678 — round 2: 2 commits, 9 hunks since round 1`. Re-reading what round 1
+cleared is not more coverage; it is the same coverage at twice the price, and it is how
+one diff came to be hunted thirteen times.
+
+**The loop is bounded.** Hunt, fix or hand off, re-hunt the delta — at most
+`SHRIKE_MAX_ROUNDS` rounds, default 3; `report_stats.sh` prints which round this is.
+When the cap is reached, stop, whatever is still open, and make the report say so: the
+*Not reviewed* row names any delta not hunted, and an **Open** list under the findings
+names each surviving candidate not yet fixed. The caller — the human, or the step that
+invoked the hunt — decides whether to spend a fourth round. This is the shape a bounded
+poll has: N attempts, then a verdict the caller acts on. "Repeat until zero findings" is
+not a stopping condition, and an agent that has watched it run thirteen rounds on one
+diff does not start the loop at all next time. A bounded loop that reports what is open
+is the one that gets run.
+
 Whatever stays unreviewed, name it. "Reviewed `abc1234...def5678`; three commits since,
 not hunted" is a usable sentence. Silence reads as coverage.
 
@@ -414,7 +504,7 @@ findings, and the cleared list.
 | | |
 |---|---|
 | **Target** | `<branch or PR>` · `<base>...<head>` |
-| **Reviewed** | N files, N hunks, N callers outside the diff, N peers compared |
+| **Reviewed** | N files, N hunks, N callers outside the diff, N peers compared — round N of M: `<prev>..<head>`, N hunks since |
 | **Not reviewed** | N hunks / N commits — and which, or `none` |
 | **Duration** | Nm Ns — N hunks/hour |
 | **Seeds worked** | N constructs · classes A,C,F,H live (B,D,E,G n/a, each with what was searched) |
@@ -424,7 +514,9 @@ findings, and the cleared list.
 ```
 
 The verdict line is one sentence: either `N findings — <the worst one in six words>`
-or `no correctness bugs found that meet the evidence bar`.
+or `no correctness bugs found that meet the evidence bar`. The round clause on the
+*Reviewed* row appears from round 2 on; when the round cap ended the loop with candidates
+still unfixed, an **Open** list follows the findings, one line each.
 
 The candidates row is what makes the report trustworthy. A run that raised 14 and
 killed 12 is showing its work; a run that reports everything it thought of is not.

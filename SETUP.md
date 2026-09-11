@@ -165,10 +165,13 @@ Run it on ~10 PRs where you already know what's in them. Track one number:
 Do not use "findings another reviewer posted per PR" as the score. It is confounded by
 diff size — bigger diffs carry fewer findings per line — and it cannot see the class this
 method wins on, because a test that tests nothing is an absence with no line to comment
-on. And keep the run log (`scripts/log_run.sh`, appending to `.agent/shrike-log.md`):
-without a per-commit record, a bug found on a reviewed *pull request* cannot be told
+on. And keep the run log: `post_report.sh` writes one JSON line per run to
+`${XDG_STATE_HOME:-~/.local/state}/shrike/runs.jsonl` (override with `SHRIKE_LOG`) before
+it posts, and a terminal-only run does the same with `scripts/log_run.sh --report`.
+Without a per-commit record, a bug found on a reviewed *pull request* cannot be told
 apart from a bug in code pushed after the report, and those have different fixes —
-recall versus coverage.
+recall versus coverage. The file is machine-local and outside every repo on purpose: a
+record inside a worktree died with it, and a tracked log conflicted on every rebase.
 
 Only once that number is stable should you turn on automatic PR triggers, roll out to
 the other repos, or make it a required check. A false positive that blocks a merge in

@@ -16,6 +16,10 @@ For each candidate, in order:
 2. **Generate the strongest rebuttal**, not a token one. Ask: what would have to be
    true for this code to be correct? Then go look for that thing.
 3. **Go read the code that would contain the rebuttal.** Not reason about it. Read it.
+   Start at the candidate's second site from Phase 2 — the other writer, the source of
+   the copy, the sibling rule, the caller acting on the return — because that is where
+   a rebuttal is, when there is one. Open the rebuttal files for all candidates in one
+   batch; they do not depend on each other.
 4. **Verdict.** Rebuttal found → delete. Rebuttal ruled out by reading code → survives
    as Confirmed/Probable. Rebuttal could not be checked → the candidate is at most
    Probable, and the unchecked rebuttal must be named in the report.
