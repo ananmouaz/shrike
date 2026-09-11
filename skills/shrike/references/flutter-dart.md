@@ -22,6 +22,14 @@ a *question*, not a finding.
   or reading `InheritedWidget`/`Provider` (needs `didChangeDependencies`).
 - **Not cancelling a subscription on rebuild** — `listen()` called in `build()` or in a
   method that runs repeatedly, accumulating subscriptions.
+- **A time budget whose clock starts before the isolate is warm.** A walk or sync given
+  a share of a total deadline, measured from a stamp taken before cold isolate boot,
+  session restore, or consent, can have its whole share consumed by that prelude and
+  never run. Name the prelude's worst case and compare it to the share.
+- **Sign-out or account switch racing a queued persist.** A debounced or queued write
+  from the previous session lands after the clear, so the signed-out state carries the
+  old user's data; the same shape as a kill-switch checked against a snapshot cached
+  at start-up while the remote value it guards has already changed.
 
 ## Null safety and types
 
@@ -113,6 +121,10 @@ a *question*, not a finding.
 
 - Permission result not handled for the denied / permanently-denied branches.
 - Deep link / route argument cast without validation.
+- **Two link or intent handlers merged into one.** The survivor's fallback — navigate
+  home on an unparseable link, say — now applies to links the other path used to pass
+  through untouched, so an OAuth callback or external URL arriving there is redirected.
+  Enumerate both old caller sets and state each one's new failure behaviour.
 - Platform-conditional code where one platform branch is untested and takes a
   different, wrong path.
 

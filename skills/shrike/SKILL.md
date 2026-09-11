@@ -189,10 +189,10 @@ reasoning about what code probably does.
 
 Open the files. Quote the lines. A trace you did not actually read is a guess.
 
-#### Four sweeps that enumerate rather than conclude
+#### Five sweeps that enumerate rather than conclude
 
 An invariant class is one question asked of the whole change, and one answer closes it.
-That is the right shape for a semantic question and the wrong shape for four families
+That is the right shape for a semantic question and the wrong shape for five families
 where the defect is *per instance*: a diff can satisfy "is there stale state here?" and
 still contain nine unguarded post-await reads. Asked as a class, these clear on the
 first instance that looks fine. So work them as **enumerations** — build the instance
@@ -204,10 +204,14 @@ to enumerate and what a row has to say.
 1. **Post-await state.** Population: every `await` in the changed files whose enclosing
    function afterwards touches something captured before it — a local, an instance
    field, a `ref`/context/store handle, `mounted`, a row read earlier, a snapshot a
-   decision was made from. Per row: what was captured, what can change it while the
-   await is open, and the re-read, currency check, or `mounted` guard that makes the
-   later use safe. Absent all three, it is a candidate. Watch for the partial case —
-   the diff adds the guard at one such read and leaves its sibling three lines down.
+   decision was made from, an array index or list position. Per row: what was captured,
+   what can change it while the await is open, and the re-read, currency check, or
+   `mounted` guard that makes the later use safe. Absent all three, it is a candidate.
+   Watch for the partial case — the diff adds the guard at one such read and leaves its
+   sibling three lines down. For an index, the population also includes positions held
+   across a refetch, a filter change, or an open sheet or dialog, not only an `await`:
+   settling a row so it drops out of the default filter reorders the list under the
+   handle, and the handle must then be a stable id.
 2. **Presence and absence.** Population: every guard in the diff deciding whether a
    value was supplied — `if (x)`, `x || d`, `x ?? d`, `!= null`, `.isEmpty`, `= false`,
    the defaults an edit form prefills. Per row: name the legal values that take the
@@ -227,6 +231,48 @@ to enumerate and what a row has to say.
    fail and the input that reaches it, and check the fixtures actually contain a case
    of the class under test: a setup filter that excludes every input the regression
    would produce is the usual shape, and it reads as a passing test forever.
+5. **Second site.** The escaped bugs that hurt most name two locations, not one: a
+   changed line and an unchanged one it depends on. Sweeps 1–4 draw their populations
+   from the diff alone; this one pairs every row with code outside it, and a row is
+   not closed until the other participant has been opened and read. A name, a comment
+   asserting the two agree, or a helper that sounds equivalent is not evidence. Five
+   kinds of row:
+   - **A write whose value, or whose decision to write, came from an earlier read** —
+     SQL `UPDATE`/`DELETE`, a store or cache write, a file write, a set into shared
+     state. The read and the write may sit in one synchronous block; the second writer
+     is another request, another admin, another isolate, or a queued callback. Per row:
+     name that second writer, then show one of: the decision's predicate repeated in
+     the write's `WHERE`, compare-and-swap, or guard; a version bumped by **every**
+     writer, this one included; a lock or transaction covering both the read and the
+     write. Absent all three, candidate. Two traps: a version that guards field X while
+     the other writer changes field Y; a cache cleared *before* the generation bump, so
+     an in-flight write passes its own stamp check and repopulates it.
+   - **A local copy seeded from a source** — `useState(props.x)`, a controller or
+     notifier seeded from a parameter, an optimistic override map. Per row: can the
+     source change while this copy is alive (a refetch, `router.refresh()`, new props, a
+     push), and if so, where is the resync — an effect on the prop, a `key=`, a reset on
+     save? Then on the write path: do the guard and the payload read the **same** copy?
+     A guard on the prop with a payload from local state is the finding even when each
+     is correct alone.
+   - **A predicate, validator, or rule the diff tightens, loosens, merges, or replaces.**
+     Per row: grep the **whole repo**, not the diff, for the other implementations of
+     the same rule — a sibling SQL function, the client-side validator, the other branch
+     of a merged path, the migration that already tightened one copy — and list each as
+     carried-forward or deliberately diverged. When two paths with different failure
+     behaviour are merged, enumerate both old caller sets and state what each one's
+     failure now does. When a gate calls a `describe*`, `summarize*`, or `diff*` helper,
+     ask what that helper omits: a display helper reused as a correctness predicate
+     gates on a lossy projection.
+   - **A loop with `continue`, `break`, or a swallowed error inside a function returning
+     a scalar** — `void`, a boolean, an "ok". Per row: does the caller act on the whole
+     input set after that return — stamp `delivered_at`, mark done, delete the queue
+     rows? If yes, the callee must return which members it actually processed, and the
+     absence of that is the finding: skipped rows marked done never retry.
+   - **A deadline, timeout, or share-of-a-total budget.** Per row: name everything that
+     runs between the clock starting and the work the budget is for — cold isolate or
+     process boot, session restore, consent, prerequisite fetches — with its worst case,
+     and check it against the share the budgeted phase is allowed. A phase given 60% of
+     a total whose prelude can consume 60% never runs.
 
 Sweep 4 is the one no diff-comment reviewer can run. A test that tests nothing is an
 *absence* — there is no wrong line to point at — so a reviewer that only annotates
@@ -308,7 +354,8 @@ already hunted:
 
 ```bash
 scripts/log_run.sh --pr <pr> --candidates 14 --killed 12 --reported 2 \
-                   --findings "1 high, 1 medium" --unreviewed none
+                   --findings "1 high, 1 medium" --unreviewed none \
+                   --sweeps "post-await 9 · presence 4 · effect-order 2 · second-site 6 · tests 2/2"
 ```
 
 It appends one line per run to `.agent/shrike-log.md` (override with `SHRIKE_LOG`),
@@ -371,7 +418,7 @@ findings, and the cleared list.
 | **Not reviewed** | N hunks / N commits — and which, or `none` |
 | **Duration** | Nm Ns — N hunks/hour |
 | **Seeds worked** | N constructs · classes A,C,F,H live (B,D,E,G n/a, each with what was searched) |
-| **Sweeps** | post-await N · presence N · effect-order N · tests N of N reverted red |
+| **Sweeps** | post-await N · presence N · effect-order N · second-site N · tests N of N reverted red |
 | **Candidates** | N raised → N killed in falsification → **N reported** |
 | **Findings** | 🔴 N critical · 🟠 N high · 🟡 N medium |
 ```
@@ -385,7 +432,8 @@ Duration comes from `report_stats.sh`, never from a guess.
 
 The sweeps row carries instance counts, not adjectives: `post-await 9` means nine
 `await`s were enumerated and each got a verdict. `post-await 0` on a diff full of async
-code is a sweep that was skipped, and it should be visible as one. For the test sweep,
+code is a sweep that was skipped, and it should be visible as one; so is `second-site 0`
+on a diff that writes a row or changes a predicate. For the test sweep,
 report how many of the changed tests were actually run against a reverted hunk — that
 is the only form of the claim that means anything.
 

@@ -22,13 +22,13 @@ Mechanical triggers. Find them, then ask the question.
 
 | Construct | Question |
 |---|---|
-| Indexing / slicing (`a[i]`, `.substring`, `.first`) | Can the collection be empty or the index out of range here? |
+| Indexing / slicing (`a[i]`, `.substring`, `.first`) | Empty collection or index out of range? If the index is held across an await or refetch, can the list reorder under it? |
 | Division / modulo | Can the divisor be zero? |
 | Non-null assertion (`!`, `as`, `unwrap`, `!!`) | Is there a path where the value is null? What made the author sure? |
 | `await` / async boundary | What state was captured before it, and is it still valid after? Is it awaited at all? |
 | Resource acquisition (open, subscribe, listen, connect) | Is release guaranteed on every exit, including throw and early return? |
 | `catch` block | Swallowed? Caught type too broad? Partial state left behind? |
-| Loop with a mutable accumulator or index | First iteration, last, empty input, single element. |
+| Loop with a mutable accumulator or index | First, last, empty, single element. If it skips members and returns a scalar, does the caller act on the whole set? |
 | Boundary operator (`<` vs `<=`) | Inclusive or exclusive, does that match the caller's assumption, and if it is a range, is the pair validated as ordered? |
 | Truthiness or nullish check (`if (x)`, `x ?? d`, `if x:`) | Can the value legitimately be `0`, `""`, `false`, or explicitly cleared — and does the absent branch then swallow it? |
 | `catch` / `except` on a named error type | Does the library actually raise *that* type on this path, or a sibling that escapes the handler? |
@@ -36,7 +36,7 @@ Mechanical triggers. Find them, then ask the question.
 | Normalizing / stripping transform (`trim`, `tr -d`, `replace`, slug) | Does it strip only the edge or wrapper it was meant to, or every occurrence anywhere in the value? |
 | Optional chain or safe-navigation followed by more access (`a?.[k].m()`, `a?.b.c`) | Does the guard cover the *whole* path, or does it short-circuit one link and then dereference anyway? |
 | Secret, connection string, or raw upstream response crossing a boundary (client bundle, CI output, log, error body) | Is it meant to be readable there? |
-| Write path (update, delete, upsert, file write) | Scoped? In a transaction with the reads it depends on? Idempotent under retry? |
+| Write path (update, delete, upsert, file write) | Scoped? Transaction, or write predicate carrying the read state? Idempotent under retry? Who else writes this row between read and write? |
 | Effect registration or sink write (`register`, `subscribe`, `addObserver`, `setCustomKey`, `report`) | Is the sink live at this line, and does its only consumer read before or after it? |
 | Concurrency token read for a guard (version, etag, sequence, generation) | Does every writer bump it, and does the payload it protects come from the same snapshot as the check? |
 | Status or completion write (`delivered_at`, `status = 'done'`, a done latch) | Did the operation confirm the effect landed — for every member the write covers? |
@@ -45,7 +45,7 @@ Mechanical triggers. Find them, then ask the question.
 | Authorization-relevant handler | A real check, using server-derived identity rather than a client-supplied ID? |
 | Money / quantity arithmetic | Integer or float? Rounding direction? Can it go negative? |
 | Cache / memo write | What invalidates it? Can it serve across a permission or tenant boundary? |
-| Retry / timeout / reconnect | What if the operation succeeded but the response was lost? |
+| Retry / timeout / deadline / budget | What if the operation succeeded but the response was lost? What runs between the clock starting and the work the budget is for? |
 | Signature change in the diff | Every caller updated — argument order, optionality, nullability, thrown types? |
 | Removed or renamed field | Every reader, including rows already persisted and clients on older versions? |
 | Feature flag / new conditional path | Does the *other* branch still work? Is the flag read consistently? |
@@ -88,9 +88,9 @@ empty filter degrading to match-everything; presence checked as truthiness (`0`,
 filled, as `= false` on a nullable column, or defaulted to the neutral value; a gate
 keyed on a lossy projection of what it guards, so an edit its summary cannot describe
 reads as no edit; a `catch`/`except` naming a type the library never raises here, so
-the retry never runs; authorization from a client-supplied or impersonated identity, or
-enforced only by an affordance the server disagrees with — on permission, on limits, or
-on an exit it offers and the handler rejects; a flag or lock cleared on one event only,
+the retry never runs; authorization from a client-supplied identity, or enforced only by an
+affordance the server disagrees with — on permission, limits, or an exit the handler
+rejects; a flag or lock cleared on one event only,
 missing the paths that unmount or abort; a `continue`/skip omitting the bookkeeping
 write the main path performs; an already-ran guard short-circuiting some of a rerun's
 effects but not others; a tightened guard now rejecting service jobs, admin flows, or
@@ -104,13 +104,13 @@ value unrepresentable.
 **Ask:** between the moment this state was captured and the moment it is used, what
 else can change it?
 
-**Shapes:** state captured before an `await` and used after; an async result applied
-without checking its session or key is still current; a ref read by a same-turn
-callback that only updates on the next render; a later pipeline pass judged against the
+**Shapes:** state captured before an `await` and used after, or an async result applied
+without checking its session or key is still current; a guard reading the source while
+the payload reads a local copy of it; a ref read by a same-turn callback that only updates on the next render; a later pipeline pass judged against the
 original input, not what earlier passes left; a gate on one async source while reading
 another that resolves separately; a draft or expansion flag keyed to an identity that
 changed underneath it; a reset performed in an effect, so the first paint still shows
-the previous state (a leftover *armed* confirm is the dangerous case); a terminal or
+the previous state — a leftover *armed* confirm; a terminal or
 in-flight marker never cleared on the early-return path, so the flow cannot be
 re-entered; a write invalidating the obvious query but not
 the sibling views over the same rows; a process-global reset by an older instance's
@@ -194,9 +194,8 @@ the stale write lands; a clear or teardown sequenced before the bump that would 
 in-flight writes; an effect emitted before its sink is initialized, or registered after
 its only consumer read — it silently no-ops; a `max`, `sort`, or window over a key that
 ties, the winner decided by input order; a client documented as not thread-safe shared
-across a pool; a fixed sleep or cron offset standing in for a signal, or two jobs on
-independent schedules whose windows overlap and each destructively reconciles the same
-rows; a dismissal handler committing an action
+across a pool; a fixed sleep or cron offset standing in for a signal, or two independently
+scheduled jobs whose windows overlap over the same rows; a dismissal handler committing an action
 while the click that dismissed it also fires; a mutation issued twice because only the UI
 guard exists; a gate false on first render and set in a later effect.
 
@@ -215,7 +214,8 @@ whose `CASCADE` reaches unenumerated tables, whose window misses concurrent writ
 locks DDL across a backfill; an applied migration or one-shot script edited in place —
 databases stamped at it never get it; `ON CONFLICT DO UPDATE` leaving unset columns
 stale, `DO NOTHING` where values must refresh; a reset or backfill missing the columns
-the selection predicate reads; a helper deleting more than its name promises; a node
+the selection predicate reads; a helper deleting more than its name promises; two paths merged, the survivor's
+failure behaviour reaching the other's callers; a node
 added to a graph but not the job that runs it; a key colliding with
 another environment's, so cleanup deletes what it does not own, or with unrelated items
 on empty-string defaults; a navigation target dropping the current view's scope.

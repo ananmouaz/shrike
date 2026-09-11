@@ -72,6 +72,11 @@ Ask these about the report as a whole:
 - Did each Phase 3 sweep produce an *instance list* with a verdict per row, or a
   conclusion? "No post-await issues" over a diff whose `await`s were never enumerated
   is not a clearance; it is the sweep not having run.
+- For every candidate or clearance that turns on a writer, a guard, or a predicate: did
+  I open the *second site* — the other writer of that row, the source the local copy
+  was seeded from, the sibling implementation of the rule, the caller acting on the
+  return — or did I take a name, a comment saying they agree, or a same-sounding helper
+  as proof? A comment asserting two predicates match is a claim, not a rebuttal.
 - Did I report anything a linter or the compiler would have caught? Remove it.
 - Did I hedge anywhere ("might", "could potentially", "consider whether")? Hedged
   findings are unfalsified findings. Either close the gap or delete.

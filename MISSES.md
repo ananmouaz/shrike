@@ -34,9 +34,9 @@ So the rule is **generalize or don't add**:
    the method: **would it change what a reviewer does on a diff it has never seen?**
 
 The budget is stated and enforced in `references/seeds-and-slicing.md`, in the order
-that binds: the classes stay eight, each class carries at most 12 shapes and ~160
-words, constructs stay language-level and finite, and the file stays under ~2,750 words
-as a backstop. Merge or delete before adding — widening an existing clause beats
+that binds: the classes stay eight, each class carries at most 12 phrase-length shapes
+(~175 words), constructs stay language-level and finite, and the file stays under
+~3,100 words as a backstop. Merge or delete before adding — widening an existing clause beats
 appending a new one.
 
 The two studies below were run *before* this rule existed and did accrete rows — 47 by
@@ -586,3 +586,105 @@ backstop. A fifth rule was added above it: if the class already had the shape, t
 not in that file at all; patch the workflow that failed to ask the question and add
 nothing. Two thirds of this study's misses resolve that way, and a file that grows on
 those is a file that will be skimmed.
+
+---
+
+## Study 6 — the High-severity residual on hunted pull requests
+
+Study 5 measured findings per pull request and found the outcome inconclusive. This
+pass asked a narrower question of the same repository, four weeks on: **stratified by
+severity and by diff size, what does a commercial reviewer still post on pull requests a
+hunt had already covered?** The answer splits cleanly. On hunted pull requests the bot's
+Medium-severity rate fell (0.50 per pull request against 0.68 unhunted); its
+High-severity rate did not move (0.28 against 0.27). Thirteen High findings landed on
+hunted code in the window. The Highs are why the bot cannot be retired, and they
+concentrate in six shapes.
+
+**The meta-pattern: twelve of the thirteen name two or three locations.** Not one
+defective line — a *relationship* between a changed line and something that did not
+change: a second writer of the same row, the source a local copy was seeded from, a
+sibling enforcement site, another caller of a merged path, the prelude before a clock
+starts. Every sweep in the workflow enumerated a population drawn from the diff. These
+bugs live in the join between the diff and the code around it, and nothing required the
+hunt to open the other side of that join before falsification began.
+
+**How the six shapes classify against the taxonomy.**
+
+1. *Check-then-act with a second writer and no compare-and-swap* — another request,
+   admin, isolate, or queued callback writes the same row between the read and the
+   write. Class G, verbatim: "read-then-write with no ... write predicate carrying the
+   state the decision was read from", plus the generation-guard and
+   clear-before-bump clauses. Sweep 1 did not reach it because the read and the write
+   sat in one synchronous block; the interleaving point was in another actor.
+2. *Derived local state never resynced to its source*, and its sharper form: a guard
+   reading the prop while the payload reads the local copy. The stack reference had
+   the `router.refresh()` instance; class C had no general clause. One shape added.
+3. *One of N sibling enforcement sites updated.* Class E verbatim, and the Phase 1 peer
+   step already said to find the peer — for *behaviour the change introduces*, not for
+   a predicate it tightens. Two sub-shapes cost two of the three: merging two paths
+   that had different failure behaviour (one clause added to H), and a display helper
+   reused as a correctness predicate (class B had "a gate keyed on a lossy projection",
+   verbatim).
+4. *Aggregate success hiding per-item skips.* Class F verbatim: "a batch result that
+   cannot express per-member outcome, so the caller stamps every member done."
+5. *Identity by position across a refetch.* Class A verbatim: "an index, order, or
+   rounded coordinate used as identity across regeneration."
+6. *A budget whose start includes unbudgeted work.* Class A verbatim — the clause Study
+   5 added.
+
+So four of six were written down word for word, one sat in a stack reference, and one
+was the peer step applied to the wrong population. By the rule at the top of this file
+that is a discipline result, and the patch is workflow.
+
+**Patch — a fifth enumerated sweep, "second site" (`SKILL.md`, Phase 3).** Population:
+every write whose value or decision came from an earlier read; every local copy seeded
+from a source; every predicate the diff tightens, loosens, merges, or replaces; every
+loop that skips inside a scalar-returning function; every deadline or share-of-total
+budget. Per row, the requirement is the same: **name the other participant and open
+it** — the second writer and the predicate, version, or lock binding it; the source and
+the resync, and whether guard and payload read the same copy; every sibling
+implementation of the rule, whole-repo grep, each marked carried-forward or diverged;
+the caller acting on the whole set after the return; the prelude between clock start
+and budgeted work. A name, a comment asserting agreement, or a same-sounding helper
+does not close a row. The count goes in the run header as `second-site N`, so a zero on
+a diff that writes a row or changes a predicate is visible as a skipped sweep.
+
+**Patch — sweep 1 widened.** Its population now names an array index or list position
+explicitly, and the interleaving point includes a refetch, a filter change, or an open
+sheet, not only an `await` in the same function.
+
+**Patch — constructs.** Four rows widened rather than added: indexing (held across a
+refetch), loop (a skip inside a scalar-returning function), write path (who else writes
+the row between the read and the write), and retry/timeout, now retry/timeout/deadline/
+budget (what runs before the budgeted work).
+
+**Patch — falsification self-check.** For every candidate or clearance that turns on a
+writer, guard, or predicate: was the second site opened, or was a comment taken as a
+rebuttal?
+
+**Stack references.** Flutter/Dart: a budget whose clock starts before the isolate is
+warm; sign-out racing a queued persist; two link handlers merged so one's fallback
+reaches the other's callers. TypeScript/Next: an optimistic override map consulted by
+truthiness; a `describe*`/`diff*` helper used as a save gate; the same eligibility rule
+in two SQL functions with only one tightened.
+
+**Not a rule gap, recorded as such.** One of the thirteen — a report emitted before its
+sink was initialized, with a latch set on the attempt — is sweep 3 word for word,
+including the "attempt or confirmation?" clause. The rule existed and the bug escaped.
+No pattern fixes that; it is a compliance failure, and the only lever is the sweep count
+in the header being read by the human.
+
+**How to tell whether this worked.** Do not measure total findings — that number moves
+with diff size, which Study 5 established. Measure **High-severity findings per hunted
+pull request**. Baseline: 0.28, statistically identical to the 0.27 on unhunted pull
+requests. Retire the bot only after roughly twenty consecutive hunted pull requests at
+zero.
+
+**Budget accounting.** `seeds-and-slicing.md` entered at 3,104 words, already at the
+backstop. Class C was at twelve clauses, so its first two — state captured before an
+`await`, and an async result applied without a currency check — merged into one before
+the guard-versus-payload shape went in. Class H went from ten clauses to eleven. Eight
+classes, none above twelve clauses or ~180 words. The file leaves at ~3,164 — about 60
+over the backstop, all of it in the four widened construct rows, after trimming six
+verbose clauses to pay for them. The per-class controls held; the total did not, and
+that is recorded rather than the cap being moved.

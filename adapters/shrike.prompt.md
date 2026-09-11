@@ -100,15 +100,15 @@ concentrate, each posing a closed question that reading code can answer.
 
 | Construct | Question |
 |---|---|
-| Indexing / slicing | Can the collection be empty or the index out of range here? |
+| Indexing / slicing | Can the collection be empty or the index out of range here? If held across an await or refetch, can the list reorder under it? |
 | Division / modulo | Can the divisor be zero? |
 | Non-null assertion (`!`, `as`, `unwrap`, `!!`) | Is there a path where this is null? |
 | `await` / async boundary | Is state captured before it still valid after? Is it awaited at all? |
 | Resource acquisition | Is release guaranteed on *every* exit, including throw? |
 | `catch` block | Swallowed? Too broad? Partial state left behind? |
-| Loop with mutable accumulator | First iteration, last, empty input, single element. |
+| Loop with mutable accumulator | First iteration, last, empty input, single element. A `continue` or swallowed error in a scalar-returning function: does the caller then act on the whole set? |
 | `<` vs `<=` | Inclusive or exclusive — does it match the caller's assumption? |
-| Write path (update/delete/upsert) | Scoped? In a transaction? Idempotent under retry? |
+| Write path (update/delete/upsert) | Scoped? In a transaction, or carrying the read state in its predicate? Idempotent under retry? Who else writes this row between the read and the write? |
 | Effect registration or sink write (`register`, `subscribe`, `setCustomKey`, `report`) | Is the sink live at this line, and does its only consumer read before or after it? |
 | Concurrency token read for a guard (version, etag, sequence) | Does every writer bump it, and is the payload it protects from the same snapshot as the check? |
 | Status or completion write (`delivered_at`, `status = 'done'`) | Did the operation confirm the effect landed — for every member the write covers? |
@@ -117,7 +117,7 @@ concentrate, each posing a closed question that reading code can answer.
 | Authorization-relevant handler | Real check, using server-derived identity? |
 | Money / quantity arithmetic | Integer or float? Rounding? Can it go negative? |
 | Cache / memo write | What invalidates it? Can it serve across a tenant or permission boundary? |
-| Retry / timeout logic | What if it actually succeeded but the response was lost? |
+| Retry / timeout / deadline / budget | What if it actually succeeded but the response was lost? What runs between the clock starting and the budgeted work? |
 | Signature change in the diff | Every caller updated? Order, optionality, nullability. |
 | Removed or renamed field | Every reader — including data already persisted. |
 | Feature flag / new conditional | Does the *other* branch still work? Flag read consistently? |
@@ -223,9 +223,9 @@ A single missing exit path is enough, but you must name it.
 
 Quote the lines you read. A trace you didn't actually open is a guess.
 
-**Then run four sweeps that enumerate rather than conclude.** An invariant class is one
+**Then run five sweeps that enumerate rather than conclude.** An invariant class is one
 question asked of the whole change, and one answer closes it — the right shape for a
-semantic question, the wrong shape for four families where the defect is *per instance*.
+semantic question, the wrong shape for five families where the defect is *per instance*.
 A diff can honestly satisfy "is there stale state here?" on the first `await` that looks
 fine and still carry nine unread ones. So build the instance list, put a verdict on every
 row, and report the counts. A sweep reported without its list was not run.
@@ -255,6 +255,36 @@ row, and report the counts. A sweep reported without its list was not run.
    reaches it, and check the fixtures actually contain a case of the class under test — a
    setup filter excluding every input the regression would produce reads as a passing
    test forever.
+5. **Second site** — the escaped bugs that hurt most name two locations: a changed line
+   and an unchanged one it depends on. Sweeps 1–4 draw their populations from the diff;
+   this one pairs each row with code outside it, and a row is not closed until that
+   other site has been opened and read — a name, a comment saying the two agree, or a
+   same-sounding helper is not evidence. Five kinds of row:
+   - *A write whose value or decision came from an earlier read* (SQL update/delete,
+     store or cache write, shared-state set). Name the second writer of that row or key
+     — another request, admin, isolate, or queued callback — then show one of: the
+     decision's predicate repeated in the write's `WHERE`/CAS/guard; a version bumped by
+     every writer including this one; a lock or transaction covering read and write.
+     Traps: a version guarding field X while the other writer changes Y; a cache cleared
+     before the generation bump, so an in-flight write passes its own check.
+   - *A local copy seeded from a source* (`useState(props.x)`, a controller seeded from a
+     parameter, an optimistic override map). Can the source change while the copy is
+     alive, and where is the resync? On the write path, do the guard and the payload
+     read the same copy? A guard on the prop with a payload from local state is the
+     finding even when each is correct alone.
+   - *A predicate, validator, or rule the diff tightens, loosens, merges, or replaces.*
+     Grep the whole repo for the other implementations — sibling SQL function, client
+     validator, the other branch of a merged path, the migration that already tightened
+     one copy — and mark each carried-forward or diverged. On a merge, enumerate both
+     old caller sets and state each one's new failure behaviour. When a gate calls a
+     `describe*`/`summarize*`/`diff*` helper, ask what it omits.
+   - *A loop with `continue`, `break`, or a swallowed error in a function returning a
+     scalar.* Does the caller act on the whole set after the return — stamp delivered,
+     mark done, delete the queue rows? Then the callee must return which members it
+     processed; skipped rows marked done never retry.
+   - *A deadline, timeout, or share-of-a-total budget.* Name everything between the clock
+     start and the budgeted work — cold boot, session restore, consent, prerequisite
+     fetches — with its worst case, against the share the phase is allowed.
 
 Sweep 4 is the one a diff-comment reviewer cannot run: a test that tests nothing is an
 *absence*, with no wrong line to point at. Do not skip it because it found nothing last
@@ -320,7 +350,7 @@ stamp Phase 0 wrote (`date +%s > /tmp/shrike-start`), not from a guess:
 | **Not reviewed** | N hunks / N commits — and which, or `none` |
 | **Duration** | Nm Ns — N hunks/hour |
 | **Seeds worked** | N constructs · classes A,C,F,H live (B,D,E,G n/a, each with what was searched) |
-| **Sweeps** | post-await N · presence N · effect-order N · tests N of N reverted red |
+| **Sweeps** | post-await N · presence N · effect-order N · second-site N · tests N of N reverted red |
 | **Candidates** | N raised → N killed in falsification → **N reported** |
 | **Findings** | 🔴 N critical · 🟠 N high · 🟡 N medium |
 ```
@@ -382,7 +412,7 @@ was already hunted:
 mkdir -p .agent && cat >> .agent/shrike-log.md <<EOF
 ## $(date -u +%Y-%m-%dT%H:%M:%SZ) — ${TARGET:-$(git rev-parse --abbrev-ref HEAD)}
 - head=\`$(git rev-parse HEAD)\` branch=\`$(git rev-parse --abbrev-ref HEAD)\`
-- sweeps: post-await N · presence N · effect-order N · tests N/N
+- sweeps: post-await N · presence N · effect-order N · second-site N · tests N/N
 - candidates: N raised → N killed → N reported
 - unreviewed: <what you did not hunt, or none>
 EOF

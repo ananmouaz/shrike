@@ -42,6 +42,14 @@ Apply as seeds, then trace and falsify. A pattern match is a question, not a fin
 - **`x || fallback` on numeric or boolean edit defaults.** A stored `0` or `false`
   takes the fallback, so opening a form and saving it without changes silently rewrites
   the value. Use `??`, and check what the field's zero legitimately means.
+- **Optimistic override map consulted by truthiness.** `overrides[id] || server` erases
+  a legitimate `0`, `""`, or `false` the user just set; and an override never cleared on
+  refetch keeps showing the local value after the server has recorded a newer decision.
+  Test presence with `id in overrides`, and clear on the refetch that supersedes it.
+- **A `describe*` / `summarize*` / `diff*` helper used as a save gate.** A headline
+  differ that skips nested or per-item fields reports "no changes" for an edit made in
+  a raw JSON view, so Save stays disabled or the payload is dropped. Ask what the
+  helper omits before accepting it as the predicate.
 - State update after unmount on an async resolution.
 - Missing `await` on a promise whose completion the next statement depends on;
   unhandled rejection in a route handler taking down the request.
@@ -76,6 +84,10 @@ Apply as seeds, then trace and falsify. A pattern match is a question, not a fin
 - **Definer RPC callable by any authenticated user** with no caller-identity check
   inside the function body. The GRANT is the exposure; the check must be internal
   (`auth.uid()` compared against the row owner), not assumed from the client.
+- **The same eligibility rule in two SQL functions**, a checker and the mutation that
+  should agree with it. Tightening one and leaving the other on the weak predicate
+  lets the mutation pass what the checker rejects. `rg` every function referencing the
+  column; a comment saying they match is not evidence — read both bodies.
 - **Guard tightened to require a JWT** breaking legitimate NULL-JWT callers — owner
   connections, service-role jobs, admin approval flows. Enumerate the non-user callers
   before clearing a new auth guard.
