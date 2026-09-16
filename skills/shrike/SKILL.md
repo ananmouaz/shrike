@@ -62,7 +62,7 @@ this"*.
 
 Run these phases in order. Do not emit any finding before Phase 5.
 
-### Run shape — the cost of a run, and the three rules that halve it
+### Run shape — avoid repeated work without reducing coverage
 
 Measured over real runs, a hunt is latency-bound on tool round-trips, not on
 reasoning: the median run made about 25 tool calls at about 15 seconds each, and every
@@ -76,13 +76,18 @@ touches the evidence bar:
    holds for the analyzer runs in Phase 0, the caller greps in Phase 1 (one per changed
    symbol), the file opens for the second-site pairs in Phase 2, and the rebuttal reads
    in Phase 4. Serialise only where one call's input is another call's output.
-2. **A round after the first hunts the delta, not the branch.** Round N is scoped to
-   `<head the last record covers>..HEAD` — see Phase 7. Round 2 re-reading everything
-   round 1 cleared is how one diff came to be hunted thirteen times.
+2. **A round after the first hunts the affected dependency slice.** Use the previous
+   coverage ledger, not just its HEAD. Include dirty changes, prior finding triggers,
+   and sibling variants; carry forward only validated, unaffected coverage. See
+   Phase 7 and `references/review-reuse.md`.
 3. **The loop is bounded.** At most `SHRIKE_MAX_ROUNDS` rounds (default 3), then the
-   report names what is still open and the caller decides — see Phase 7. "Repeat until
-   zero findings" has no end, and a hunt that has once run unbounded does not get
-   started the next time.
+   report names what is still open and the caller decides — see Phase 7. An explicit
+   project continuation policy takes precedence. The cap never means clean.
+
+**When preparing evidence for another reviewer or continuing a review chain, read
+`references/review-reuse.md`.** It defines snapshot validation, the coverage ledger,
+dependency invalidation, and the handoff contract. Fresh judgment does not require
+recollecting unchanged source evidence. A prior report alone does not prove coverage.
 
 ### Phase 0 — Deterministic pass first
 
@@ -90,7 +95,7 @@ touches the evidence bar:
 took, and that number is only honest if it is measured, not estimated:
 
 ```bash
-date +%s > /tmp/shrike-start
+date +%s > "${SHRIKE_START_FILE:-/tmp/shrike-start}"
 ```
 
 Never spend reasoning on what a tool decides. Run the project's own analyzers and
@@ -99,6 +104,11 @@ read their output before forming any hypothesis:
 ```
 scripts/static_pass.sh [path]
 ```
+
+For repeated/concurrent runs, set `SHRIKE_START_FILE` to an absolute path in this
+review chain's scratch directory and pass it to each tool call. Reuse a deterministic
+result only with matching inputs, command, tool version and environment as defined
+in `references/review-reuse.md`; otherwise rerun the required check.
 
 This runs whatever the repo has (`dart analyze`, `tsc --noEmit`, `eslint`, `go vet`,
 `cargo check`, `ruff`, `semgrep`) and collects results. Also run the existing test
@@ -236,6 +246,16 @@ reasoning about what code probably does.
 
 Open the files. Quote the lines. A trace you did not actually read is a guess.
 
+**Close the finding family before handing off fixes.** When a credible candidate
+exposes a missing case, read the family-closure section of `references/review-reuse.md`
+and enumerate reachable sibling states, callers, writers or exits of the same
+invariant. For async state, distinguish no value from resolved `null`, then trace
+initial load/failure, resolved values, refresh and failed refresh with retained
+`null`/empty/nonempty values. Verify provider semantics against the pinned version.
+Give every row evidence and a verdict; send every candidate variant through Phases
+4–5. One shared cause/correction can contain several triggers. Distinct causes stay
+separate. This is bounded closure of a discovered family, not an extra whole-repo hunt.
+
 #### Five sweeps that enumerate rather than conclude
 
 An invariant class is one question asked of the whole change, and one answer closes it.
@@ -359,8 +379,10 @@ candidates in one batch.
 **Kill rule:** if you cannot rule out the rebuttal by pointing at code, the finding
 dies. Not "downgraded" — deleted. Do not report it with a hedge.
 
-Expect this phase to eliminate most candidates. If it eliminates none, you were not
-being adversarial; run it again with real hostility.
+For each candidate, record the strongest rebuttal and the code checked to resolve it.
+Repeat only where that evidence is missing. Zero rejected candidates is possible,
+especially in a fix round; it is not a reason to repeat a completed pass or invent a
+rejection quota.
 
 ### Phase 5 — Prove what survives
 
@@ -387,6 +409,13 @@ Rank by severity × confidence. **Cap at 5 findings.** If more than 5 survive, r
 the top 5 and note the count of the rest rather than listing them — a wall of
 findings is the failure mode this skill exists to prevent.
 
+The cap limits the displayed report, not the hunt or fix handoff. Preserve **every**
+surviving finding and family trigger in the coverage ledger, link it from the report,
+and give it to the fixer so all known defects can be addressed together. State the
+total and the displayed count separately; `Candidates → N reported` and severity
+counts include all surviving findings in the linked ledger. Never hide unresolved
+findings behind a zero-new-findings verdict in a later round.
+
 Before writing, check for a `review-rules.md` at the repo root (see "Learning" below)
 and drop anything it tells you to suppress.
 
@@ -397,7 +426,9 @@ SHRIKE_PR=<pr> scripts/report_stats.sh   # elapsed, rate, files/hunks, range, un
 ```
 
 With `SHRIKE_PR` set it also reads the commit the previous report covered and prints
-what has been pushed since. A non-empty delta means Phase 7 is not done.
+what has been pushed since. These legacy commit statistics are advisory: they do not
+validate working-tree snapshots or coverage. Use the ledger and snapshot comparison
+for Phase 7; an empty commit delta is not proof that staged/untracked fixes were read.
 
 Then render the report (format below), print it to the terminal, and — if this run is
 against a pull request — post the same markdown as one PR comment:
@@ -466,27 +497,34 @@ understanding is already loaded. The same holds for a rollup or integration pull
 request: it is a distinct diff against a distinct base, and reviewing each contributing
 branch is not reviewing their merge.
 
-**A round after the first is scoped to that delta, not to the branch.** Round 1 hunted
-`<base>...<head₁>`. Round N hunts `<head the last record covers>..HEAD` plus the working
-tree — the range `report_stats.sh` prints as `since`. Re-run Phase 1's caller
-enumeration for every symbol the delta changes, Phase 2's pairs and the five sweeps over
-the delta's hunks, and falsification over the new candidates. A row an earlier round
-cleared is reopened only when the delta touches its lines or its second site; everything
-else keeps the verdict it already has, and the header says so: `Reviewed
-abc1234..def5678 — round 2: 2 commits, 9 hunks since round 1`. Re-reading what round 1
-cleared is not more coverage; it is the same coverage at twice the price, and it is how
-one diff came to be hunted thirteen times.
+**A round after the first reviews the affected dependency slice.** Round 1 covers the
+original target plus staged, unstaged and untracked changes. Round N compares the
+current snapshot with the prior ledger, then follows changed producers, callers,
+consumers, writers, peers, tests and config to a verified unchanged boundary. Re-run
+Phases 1–5 there, including the five sweeps, prior findings' triggers and their family
+matrices. Carry forward other rows only when all their dependencies remain valid;
+line overlap with a second site alone is insufficient. Search again for newly added
+callers/siblings. Preserve and finish any gaps in the original coverage.
+
+Follow `references/review-reuse.md` for invalidation and full-review fallbacks. A
+missing/incomplete ledger, unknown dependency boundary or changed base cannot safely
+be treated as a tiny fix review. Record reused/reopened coverage in the header. If
+inputs and evidence are unchanged and coverage is complete, return the prior verdict
+without launching another hunt. Open findings remain open until independently verified.
 
 **The loop is bounded.** Hunt, fix or hand off, re-hunt the delta — at most
-`SHRIKE_MAX_ROUNDS` rounds, default 3; `report_stats.sh` prints which round this is.
+`SHRIKE_MAX_ROUNDS` rounds, default 3, unless the project explicitly requires further
+rounds. Count this review chain in its ledger; the legacy `report_stats.sh` round
+number counts historical branch records and is not a chain budget.
 When the cap is reached, stop, whatever is still open, and make the report say so: the
 *Not reviewed* row names any delta not hunted, and an **Open** list under the findings
-names each surviving candidate not yet fixed. The caller — the human, or the step that
-invoked the hunt — decides whether to spend a fourth round. This is the shape a bounded
-poll has: N attempts, then a verdict the caller acts on. "Repeat until zero findings" is
-not a stopping condition, and an agent that has watched it run thirteen rounds on one
-diff does not start the loop at all next time. A bounded loop that reports what is open
-is the one that gets run.
+names each surviving candidate not yet fixed or verified. Never mark a partial review
+clean or write a covering record that a push gate would interpret as clearance.
+The caller decides whether to continue, unless its existing instructions already
+authorize continuation. A clean exit requires complete original coverage, all prior
+findings independently resolved, every family row resolved and a matching current
+snapshot. Never confuse zero new findings, exhausted budget or unchanged HEAD with
+those conditions.
 
 Whatever stays unreviewed, name it. "Reviewed `abc1234...def5678`; three commits since,
 not hunted" is a usable sentence. Silence reads as coverage.
@@ -509,6 +547,7 @@ findings, and the cleared list.
 | **Duration** | Nm Ns — N hunks/hour |
 | **Seeds worked** | N constructs · classes A,C,F,H live (B,D,E,G n/a, each with what was searched) |
 | **Sweeps** | post-await N · presence N · effect-order N · second-site N · tests N of N reverted red |
+| **Reuse / families** | N rows reused, N reopened; N family rows resolved, N open; ledger: `<absolute path>` |
 | **Candidates** | N raised → N killed in falsification → **N reported** |
 | **Findings** | 🔴 N critical · 🟠 N high · 🟡 N medium |
 ```

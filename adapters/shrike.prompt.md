@@ -42,21 +42,48 @@ undiagnosable failure. What stays out is *"add a test for this"*.
 If a finding cannot be phrased as "when X happens, the program does Y, which is
 wrong," it is not a finding. Delete it.
 
-## Execute these phases in order. Write each phase's output to a file before starting
-## the next one. Do not emit any finding before Phase 5.
+## Execute these phases in order
+
+Write each phase's output to a file before starting the next one. The `.shrike/`
+paths below are relative to a chain-specific scratch directory **outside** the target
+worktree, not its source root. Do not emit any finding before Phase 5.
 
 **Run shape.** A hunt is latency-bound on tool round-trips, not on reasoning. Issue
 independent tool calls together in one message — the five sweep greps in Phase 3, the
 one-grep-per-symbol caller search in Phase 1, the second-site file opens in Phase 2, the
 rebuttal reads in Phase 4 — and serialise only where one call's input is another's
-output. A round after the first hunts only the delta since the last recorded head, and
-the loop stops after `SHRIKE_MAX_ROUNDS` rounds (default 3) with what is still open
-named in the report (Phase 7).
+output. A round after the first hunts the affected dependency slice, including prior
+finding triggers and sibling variants. Preserve validated unaffected coverage. The
+default handoff budget is `SHRIKE_MAX_ROUNDS` (3), unless the project explicitly
+requires continued rounds. A cap is never a clean verdict (Phase 7).
+
+**Evidence handoff for repeated rounds.** Keep a snapshot and coverage ledger in a
+session-specific directory outside the reviewed tree; pass their absolute paths to
+each fresh reviewer. Snapshot identity includes worktree, target/base tip, merge-base,
+HEAD, staged and unstaged patches, untracked file contents/modes, and any external or
+ignored dependency used as evidence. When the skill scripts are available, use
+`python3 <skill>/scripts/review_snapshot.py --base <ref>`, adding `--dependency FILE`
+for external/ignored inputs. Otherwise capture these inputs and their content hashes
+manually. Recheck them before recording; HEAD alone misses uncommitted fixes.
+
+Store raw caller/peer searches, excerpts and pinned provider semantics separately
+from conclusions. The ledger records the original target, chain round, snapshot,
+seed/sweep verdicts, second sites and all dependencies of each clearance, family
+matrices, all findings with stable IDs and status, and unreviewed gaps. Freeze each
+round and link its successor. Reuse facts after validating their inputs; a fresh
+reviewer independently judges the affected slice and may challenge prior verdicts.
+An unchanged snapshot is not proof that a review finished. A legacy run-log SHA
+without the ledger does not justify narrowing the scope.
+
+Reuse tool results only with identical source/config/dependency inputs, command,
+tool version and relevant environment. Preserve required project checks. Concurrent
+runs use separate absolute `SHRIKE_START_FILE` paths in their scratch directories;
+stamp and read that path instead of sharing `/tmp/shrike-start`.
 
 ### Phase 0 — Deterministic pass → `.shrike/0-tools.txt`
 
 **Stamp the start time first** — the report states how long the hunt took, and that is
-only honest if measured: `date +%s > /tmp/shrike-start`
+only honest if measured: `date +%s > "${SHRIKE_START_FILE:-/tmp/shrike-start}"`
 
 Run the project's own analyzers (`dart analyze`, `tsc --noEmit`, `eslint`, `go vet`,
 `cargo check`, `ruff`, `semgrep` — whichever apply) and the test suite if it's fast.
@@ -315,6 +342,22 @@ Sweep 4 is the one a diff-comment reviewer cannot run: a test that tests nothing
 *absence*, with no wrong line to point at. Do not skip it because it found nothing last
 time.
 
+#### Finding-family closure before fixes
+
+When a credible candidate exposes a missing case, enumerate reachable siblings of
+the same invariant before ending Phase 3. For async state, distinguish no resolved
+value from resolved `null`: initial load/failure; successful `null`/empty/nonempty;
+refresh and failed refresh retaining each legal value; retry/invalidation/input
+switches if supported. Verify branch precedence and overlapping loading/error/value
+flags against the actual producer and pinned provider implementation.
+
+Each row records producer state, consumer branch, expected/actual behavior, and code
+or test evidence. Impossible states need evidence; unknown states remain unreviewed.
+For other families use implicated callers, writers, absent values or exit paths.
+Stop at the verified family boundary; do not enumerate unrelated features. Send all
+candidate variants through falsification/proof. Group only a shared cause and fix,
+retaining all triggers, and give the fixer the complete matrix in one handoff.
+
 ### Phase 4 — Falsification → `.shrike/4-survivors.md`
 
 **Read `.shrike/3-candidates.md` back from disk before starting.** This is not
@@ -338,8 +381,8 @@ rebuttal reads in one batch):
 **Kill rule:** if you cannot rule out the rebuttal by pointing at code, the finding
 dies. Deleted, not downgraded. Do not report it with a hedge.
 
-Expect this phase to eliminate most candidates. If it eliminates none, you weren't
-being adversarial — run it again with real hostility.
+Record the strongest rebuttal and the code checked for every candidate. Repeat only
+to fill a specific evidence gap; zero rejected candidates does not require a retry.
 
 **These classes need extra evidence** because they're where models hallucinate most:
 race conditions (name the two concurrent entry points, the interleaving, the shared
@@ -365,8 +408,12 @@ Rank by severity × confidence. **Cap at 5.** If more survive, report the top 5 
 the remaining count. Check for a `review-rules.md` at the repo root and drop anything
 it says to suppress.
 
+Keep every surviving finding and trigger in the linked ledger and hand all of them
+to the fixer together. The cap limits display, not discovery or fixing. Candidate
+and severity totals include all survivors; state the displayed count separately.
+
 Open with a run header carrying the *measured* numbers. Elapsed time comes from the
-stamp Phase 0 wrote (`date +%s > /tmp/shrike-start`), not from a guess:
+stamp Phase 0 wrote, using `SHRIKE_START_FILE` when set, not from a guess:
 
 ```
 ## 🔪 Shrike — <verdict: "N findings — worst one in six words" or "no correctness bugs found that meet the evidence bar">
@@ -379,6 +426,7 @@ stamp Phase 0 wrote (`date +%s > /tmp/shrike-start`), not from a guess:
 | **Duration** | Nm Ns — N hunks/hour |
 | **Seeds worked** | N constructs · classes A,C,F,H live (B,D,E,G n/a, each with what was searched) |
 | **Sweeps** | post-await N · presence N · effect-order N · second-site N · tests N of N reverted red |
+| **Reuse / families** | N rows reused, N reopened; N family rows resolved, N open; ledger: `<absolute path>` |
 | **Candidates** | N raised → N killed in falsification → **N reported** |
 | **Findings** | 🔴 N critical · 🟠 N high · 🟡 N medium |
 ```
@@ -393,7 +441,7 @@ means the pass was shallow — not that the code was clean. Never report `no cor
 bugs found` for a range you did not work; say what you covered. Compute the numbers:
 
 ```bash
-S=$(cat /tmp/shrike-start); E=$(date +%s); echo "$(( (E-S)/60 ))m $(( (E-S)%60 ))s"
+S=$(cat "${SHRIKE_START_FILE:-/tmp/shrike-start}"); E=$(date +%s); echo "$(( (E-S)/60 ))m $(( (E-S)%60 ))s"
 git diff --name-only "$BASE"...HEAD | wc -l      # files
 git diff -U0 "$BASE"...HEAD | grep -c '^@@'      # hunks
 git diff --stat <sha-of-last-report>..HEAD       # what a previous report does not cover
@@ -482,18 +530,31 @@ the old one is class H, and it is yours.
 The same holds for a rollup or integration pull request: it is a distinct diff against a
 distinct base, and reviewing each contributing branch is not reviewing their merge.
 
-**A round after the first is scoped to that delta.** Round N hunts `<head the last
-record covers>..HEAD` plus the working tree: callers of the symbols the delta changes,
-second-site pairs and the five sweeps over the delta's hunks, falsification over the new
-candidates. A row an earlier round cleared is reopened only when the delta touches its
-lines or its second site. Say so in the header: `round 2: 2 commits, 9 hunks since
-round 1`.
+**A round after the first reviews the affected dependency slice.** Compare snapshots,
+including staged/unstaged/untracked changes. Follow changed producers, callers,
+consumers, writers, peers, tests and config to a verified unchanged boundary. Reopen
+ledger rows whose dependencies changed, transitively, and search again for new
+callers/siblings. Run Phases 1–5 and all five applicable sweeps on this slice, plus
+every prior finding's trigger and family matrix. Carry forward other rows only with
+validated dependencies. Preserve and finish previous coverage gaps before clearance.
 
-**The loop is bounded.** At most `SHRIKE_MAX_ROUNDS` rounds (default 3). At the cap,
+A rebase/base change, shared schema/config or provider change, missing ledger or
+unknown dependency boundary widens scope; if the boundary cannot be proved, do a
+full review of the original target. An unchanged snapshot and completed review means
+reuse its verdict; open findings remain open. Zero new findings on a partial delta
+is not clean. Clean requires complete original coverage, no unresolved family rows
+or findings, and a matching current snapshot. Do not write a covering record for a
+partial/moving target if the caller uses that record as push clearance.
+
+**The loop is bounded.** Default `SHRIKE_MAX_ROUNDS` is 3, unless a project explicitly
+requires further rounds. Count rounds in this review chain, not historical branch
+records. Each round must review an actual delta, close a finding, or cover a named
+gap; otherwise report the lack of progress. At the cap,
 stop, and make the report say what is open: the *Not reviewed* row names any delta not
 hunted, and an **Open** list under the findings names each surviving candidate not yet
-fixed. The caller decides whether to spend another round. "Repeat until zero findings"
-is not a stopping condition.
+fixed or verified. The caller decides whether to spend another round unless its
+existing instructions already authorize continuation. A clean exit requires complete
+coverage and all fixes verified, never merely zero new findings or an exhausted budget.
 
 Whatever stays unreviewed, name it in the report. Silence reads as coverage.
 

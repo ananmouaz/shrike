@@ -82,13 +82,42 @@ tries to prove itself wrong.
    guard upstream? A type that makes the bad value impossible? A framework guarantee? A
    test that already covers it? **If the rebuttal can't be closed by pointing at actual
    code, the finding is deleted.** Not softened, not marked "low confidence." Deleted.
-   Most candidates die here. If none died, the pass wasn't honest.
+   Each candidate needs an evidenced rebuttal check. Rejection counts are not a quota.
 5. **Prove what's left.** Ideally by writing a failing test and running it. If the test
    passes, the finding was wrong — delete it.
 6. **Report at most five things**, and show the body count.
 7. **Hunt the diff you haven't reviewed** — the fixes the run just applied, and anything
    pushed since the commit the report covers. A reviewer that runs once loses to a bot
    that runs on every push, and it loses on coverage, not on reasoning.
+
+## Faster review/fix loops
+
+Repeated reviews use three mechanisms without changing the finding threshold:
+
+- **Close the family in the current round.** A missing async state triggers a bounded
+  matrix of reachable initial, resolved, refresh and failed-refresh states. All
+  surviving sibling defects reach the fixer together, including findings beyond the
+  five displayed in the report.
+- **Reuse captured evidence.** `python3 skills/shrike/scripts/review_snapshot.py
+  --base <ref>` saves immutable diff evidence outside the target worktree. Its key
+  includes staged/unstaged/untracked edits, not just HEAD. Pass the bundle and raw
+  caller/peer/provider evidence to the next reviewer. Add `--dependency FILE` for
+  ignored or external inputs; the helper does not validate live services or env state.
+- **Review the affected dependency slice at full depth.** Fresh reviewers receive a
+  coverage ledger and independently check changed behavior, previous triggers and
+  siblings. Unchanged clearances survive only with validated dependencies. Missing
+  evidence or uncertain impact widens the review, up to the whole original target.
+
+A project hook that always says "review the entire branch" must adopt this handoff
+to benefit. Keep the clean-result requirement: zero new findings on an incomplete
+delta is not clearance. The default three-round budget is a handoff limit, not proof
+of correctness, and explicit project continuation rules take precedence.
+
+See [the reuse protocol](skills/shrike/references/review-reuse.md). Validate the helper
+with `python3 scripts/test_review_snapshot.py -v` and rebuild the portable prompt with
+`bash scripts/build_portable.sh`. These checks verify snapshot behavior, not reviewer
+recall. Measure total review/fix time and escaped bugs on comparable changes before
+claiming a speedup with equal quality.
 
 ## "Zero findings" is a good day
 

@@ -10,9 +10,9 @@ commits not yet on the default branch).
 Follow the skill's scope contract exactly: report only correctness bugs backed by
 a concrete failure scenario. Zero findings is a valid, successful result.
 
-Two things about the output:
+Review handoff and output:
 
-- Stamp the start time in Phase 0 (`date +%s > /tmp/shrike-start`) and use
+- Stamp the start time in Phase 0 (use a chain-specific `SHRIKE_START_FILE`) and use
   `scripts/report_stats.sh` in Phase 6, so the run header carries a measured
   duration, file/hunk counts, hunks-per-hour, and the candidates raised → killed →
   reported line. Never estimate those numbers. On a pull request, run it as
@@ -31,7 +31,14 @@ Two things about the output:
 - Issue independent tool calls together in one message: the five sweep greps, the
   per-symbol caller greps, the second-site file opens. The run is latency-bound on
   round-trips.
-- Do not stop at Phase 6 if you fixed anything or the branch moved. Phase 7 exists
-  because a report is only true of the commit range in its header. A round after the
-  first hunts only the delta since the last recorded head, and the loop stops after
-  `SHRIKE_MAX_ROUNDS` rounds (default 3) with what is still open named in the report.
+- Close each credible candidate's reachable sibling states before handing off fixes.
+  Read `references/review-reuse.md`; give the fixer all survivors and family triggers,
+  including those beyond the five displayed findings.
+- For another round, pass the evidence bundle and coverage ledger to the fresh
+  reviewer. Review the changed dependency slice plus prior triggers and siblings at
+  full depth; reuse only validated unaffected coverage. Missing ledger or uncertain
+  dependency boundary means widening the hunt. Include dirty and untracked changes.
+- Do not stop at Phase 6 if fixes or a moving target remain unreviewed. Zero new
+  findings is not clean without complete original coverage and verified fixes.
+  `SHRIKE_MAX_ROUNDS` (default 3) is a handoff budget, never clearance; an explicit
+  project continuation policy takes precedence. Count rounds in this chain.

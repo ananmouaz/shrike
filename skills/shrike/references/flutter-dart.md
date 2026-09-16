@@ -44,14 +44,18 @@ a *question*, not a finding.
 
 ## State management
 
+When a candidate involves loading/error/value selection, apply the family matrix in
+`review-reuse.md` before handing off fixes. Validate the installed provider version
+and options; the patterns below are seeds, not universal framework guarantees.
+
 - Stale closure capturing an old value in a callback registered once.
 - Provider/Riverpod/Bloc: reading state after an await without re-reading; emitting on
   a closed Bloc/sink; `context.read` vs `context.watch` misuse causing a missed rebuild
   (only a bug if it produces observably wrong UI state — otherwise out of scope).
 - State mutated in place where the framework compares by identity, so no rebuild fires.
-- **`AsyncValue.value ?? default`** — `.value` is null both while loading and after an
-  error, so the default silently substitutes for real data in both states. Check what
-  the default does downstream (a stale reward amount, a wrong threshold).
+- **`AsyncValue.value ?? default`** — check when the pinned implementation returns
+  null, retains a value or throws, and whether resolved null is a legal value. A
+  default can conflate distinct states downstream (a wrong amount or threshold).
 - **Derived state gated on one provider, read from another.** Gating on
   `providerA.hasValue` then reading `providerB` assumes they resolve together; they
   don't. The read can see loading/stale data the gate never checked.
@@ -65,10 +69,10 @@ a *question*, not a finding.
   open but does not complete the underlying future, so a second await of the same
   future blocks again — and anything irreversible done in between (a consumed share
   buffer, a cleared plugin intent) is already gone.
-- **`AsyncValue.when` on a refresh path.** `when` takes the `error` branch even when a
-  previous value is retained, so a failed background refresh replaces loaded content
-  with the retry placeholder. Check the sibling screens: if they use a helper that
-  keeps stale data on error, the divergence is the finding.
+- **`AsyncValue.when` on a refresh path.** Trace which branch its version and options
+  select while refreshing or failing with retained data, including retained null.
+  Compare with the intended contract and sibling screens; replacing retained content
+  with an error placeholder is a candidate only when that behavior is wrong.
 - **A lifecycle trigger added without the precondition its original call site had.**
   A check rewired to `AppLifecycleState.resumed` also runs pre-auth; if the provider
   behind it requires a user id, every signed-out resume throws, and an error recorder
