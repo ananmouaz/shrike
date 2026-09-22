@@ -85,7 +85,11 @@ Save two separate artifacts beside the bundle, without editing its captured file
   output · the consumer's decision on that output · verdict`, one row per input in the
   fixed set. The verdict compares *rows*, not a row against an expectation — two inputs
   a human reads the same way whose decisions differ is the finding. An input with no
-  recorded output was not run, and the row stays open.
+  recorded output was not run, and the row stays open. A **parity** row is `rule · layer A
+  location and quoted text · layer B location and quoted text · each boundary value
+  (`0`, `0.5`, `null`, empty, max) and the answer each text gives it · verdict`. The
+  verdict is *same*, *differs*, or *not comparable* with the reason; a row holding one
+  text, or a *same* with no quoted second text, is open.
 
 Put the ledger and snapshot paths in the report and `log_run.sh --note` as well as
 the next reviewer's prompt. This is a handoff protocol, not an automatic dependency
@@ -106,7 +110,7 @@ run-log SHA with no coverage evidence is not a reviewed baseline.
    contract is supported by evidence. Reopen every ledger row depending on a changed
    participant, transitively. Rerun searches that might gain a new caller or sibling;
    the old search results alone cannot prove the population is still complete.
-3. Run Phases 1–5 at full depth on that slice, including all six applicable sweeps.
+3. Run Phases 1–5 at full depth on that slice, including all seven applicable sweeps.
    Explicitly recheck every prior finding's trigger and all its family rows, and
    verify its correction has not broken the previously valid cases. Unchanged
    evidence may support a row; a fix author's claim cannot close it.

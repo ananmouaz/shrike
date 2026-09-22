@@ -88,6 +88,12 @@ Apply as seeds, then trace and falsify. A pattern match is a question, not a fin
   should agree with it. Tightening one and leaving the other on the weak predicate
   lets the mutation pass what the checker rejects. `rg` every function referencing the
   column; a comment saying they match is not evidence — read both bodies.
+- **A predicate in SQL and its twin in TypeScript disagree at the edges.** `coins > 0`
+  accepts `0.25` where `Math.round(coins) > 0` rejects it. `NULL > 0` is `NULL`, so
+  `WHERE NOT (coins > 0)` drops NULL rows entirely while the JavaScript `!(coins > 0)`
+  is `true` for `null` and keeps them. `numeric` compares exactly; the `number` that
+  read it is a float. Put both texts in the parity row and walk `0`, `0.5`, `null`,
+  empty and max across each.
 - **Guard tightened to require a JWT** breaking legitimate NULL-JWT callers — owner
   connections, service-role jobs, admin approval flows. Enumerate the non-user callers
   before clearing a new auth guard.

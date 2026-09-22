@@ -108,6 +108,12 @@ and options; the patterns below are seeds, not universal framework guarantees.
   user's data into another session. Critical.
 - Missing migration handling for a changed persisted shape (Hive/Isar/SharedPreferences/
   sqflite): old records on disk still have the old shape after an app update.
+- **A form `validator:` and the server's constraint are one rule in two places.** A Dart
+  validator rejecting a `0` the API accepts, or a `TextInputFormatter` capping a field
+  shorter than the column allows, hides the disagreement for as long as this app is the
+  only writer — then a web admin, a script, or a replayed request writes the value the
+  form could never produce. Put both texts in the parity row; the boundary that
+  separates them is almost always `0`, empty, or max length.
 
 ## Network and idempotency
 

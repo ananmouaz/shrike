@@ -865,3 +865,40 @@ keyboards substitute a curly apostrophe and an en dash, so a guard written with 
 ASCII apostrophe stops matching real input while every fixture passes. TypeScript:
 `Number`, `parseFloat` and `parseInt` disagree on the same string — `Number('')` is `0`,
 `parseFloat('1,5')` is `1`, and `parseInt` stops at the first non-digit.
+
+### Miss — one rule, two layers, agreeing everywhere except at a boundary
+
+**The bug.** An eligibility rule lived in two places, because both places needed it: a
+predicate in a SQL function and the same predicate re-evaluated in application code.
+Both copies were written deliberately, both are defensible read alone, and they agree on
+every value anyone tried by hand. They disagree on a fraction: a balance of `0.25`
+satisfies `coins > 0` in SQL and fails `Math.round(coins) > 0` in JavaScript, so the two
+layers hold different answers to one question and only the layer that happens to run
+second is ever observed.
+
+**Classes that already absorbed it.** E (duplicated truth) is this class exactly, and
+sweep 5's third row kind already sends the reviewer to grep the whole repository for
+other implementations of a rule the diff changed.
+
+**Why the method missed it anyway.** Both are satisfied by *finding* the other copy.
+Neither requires reading the two texts against each other, so "the sibling SQL function
+exists and was updated too" closes the row while the arithmetic inside the two updated
+copies still differs. And both are scoped to a rule the diff *changed*: a pair the diff
+touched on one side only never entered a population at all. Nothing added to
+`seeds-and-slicing.md`.
+
+**Patch — a seventh enumerated sweep, "parity" (`SKILL.md`, Phase 3).** Population:
+every rule that exists in two layers or on two surfaces — SQL and application code, API
+and client, migration backfill and runtime check, schema constraint and validator. Per
+row the two texts go in the ledger **side by side and quoted**, and the boundary values
+that separate them are walked across both: `0`, `0.5`, `null`, empty, max. **A pair
+whose answers differ on any boundary value is a candidate.** *Not comparable*, with the
+reason, is an honest verdict; *same* on no quoted second text is not. The sweep runs on
+a pair even when the diff changed only one side, which is what separates it from sweep
+5. The count enters the run header as `parity N` and the record as `sweeps.parity`.
+
+**Stack clauses.** TypeScript/Postgres: `coins > 0` accepts `0.25` where
+`Math.round(coins) > 0` rejects it, and `NULL > 0` is `NULL`, so `WHERE NOT (coins > 0)`
+drops NULL rows while the JavaScript twin keeps them. Flutter/Dart: a form `validator:`
+and the server constraint are one rule in two places, and the disagreement stays hidden
+for as long as the app is the only writer.

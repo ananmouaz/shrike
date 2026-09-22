@@ -71,7 +71,7 @@ slow has a recall of zero, so cost is a recall problem. Three rules, none of whi
 touches the evidence bar:
 
 1. **Independent tool calls go out together, in one message.** The sweep greps in
-   Phase 3 read the same diff and do not depend on each other: issue all six as
+   Phase 3 read the same diff and do not depend on each other: issue all seven as
    parallel tool calls in a single message and read the results together. The same
    holds for the analyzer runs in Phase 0, the caller greps in Phase 1 (one per changed
    symbol), the file opens for the second-site pairs in Phase 2, and the rebuttal reads
@@ -256,19 +256,19 @@ Give every row evidence and a verdict; send every candidate variant through Phas
 4–5. One shared cause/correction can contain several triggers. Distinct causes stay
 separate. This is bounded closure of a discovered family, not an extra whole-repo hunt.
 
-#### Six sweeps that enumerate rather than conclude
+#### Seven sweeps that enumerate rather than conclude
 
 An invariant class is one question asked of the whole change, and one answer closes it.
-That is the right shape for a semantic question and the wrong shape for six families
+That is the right shape for a semantic question and the wrong shape for seven families
 where the defect is *per instance*: a diff can satisfy "is there stale state here?" and
 still contain nine unguarded post-await reads. Asked as a class, these clear on the
 first instance that looks fine. So work them as **enumerations** — build the instance
 list, put a verdict on every row, and carry the counts into the report header. A sweep
 reported without its instance list was not run. Each has a construct row in
 `references/seeds-and-slicing.md` stating its question; what follows is the population
-to enumerate and what a row has to say. **Build all six populations in one message**:
-the greps read the same diff and share nothing, so six parallel tool calls cost one
-round-trip, not six.
+to enumerate and what a row has to say. **Build all seven populations in one message**:
+the greps read the same diff and share nothing, so seven parallel tool calls cost one
+round-trip, not seven.
 
 1. **Post-await state.** Population: every `await` in the changed files whose enclosing
    function afterwards touches something captured before it — a local, an instance
@@ -368,6 +368,28 @@ round-trip, not six.
    and still makes a negation guard keyed on the contraction stop matching. Reading the
    transform never shows this. Only the two outputs side by side, against the consumer's
    decision, do.
+
+7. **Parity.** Population: every rule that exists in two layers or on two surfaces —
+   a predicate in SQL and the same predicate re-evaluated in application code, an API
+   contract and the client written against it, a migration backfill and the runtime
+   check that maintains the same column, a schema constraint and the validator in front
+   of it. Both copies are usually deliberate; both are usually defensible; they agree on
+   every value anyone tried by hand.
+
+   Per row: put the two **texts** in the ledger side by side, quoted, and then walk the
+   **boundary values that separate them** across both — `0`, `0.5`, `null`, empty, max.
+   **A pair whose answers differ on any boundary value is a candidate.** A balance of
+   `0.25` satisfies `coins > 0` in SQL and fails `Math.round(coins) > 0` in the
+   application, so the two layers hold different answers to one question and only the
+   layer that happens to run second is ever observed. Quoting both texts is the work: a
+   name, a comment asserting the two agree, or a helper that sounds equivalent closes
+   nothing, and *not comparable*, with the reason, is an honest verdict where *same* on
+   no evidence is not.
+
+   This is not sweep 5's third row kind. That one asks whether every other
+   implementation of a rule the diff *changed* was carried forward, and it is satisfied
+   by finding the sibling. This one asks whether the two texts **agree**, and it runs on
+   a pair even when the diff changed only one side of it, or neither.
 
 Sweep 4 is the one no diff-comment reviewer can run. A test that tests nothing is an
 *absence* — there is no wrong line to point at — so a reviewer that only annotates
@@ -566,7 +588,7 @@ row and second site is worked again and gets a fresh verdict. Stamp the round
 original target plus staged, unstaged and untracked changes. Round N compares the
 current snapshot with the prior ledger, then follows changed producers, callers,
 consumers, writers, peers, tests and config to a verified unchanged boundary. Re-run
-Phases 1–5 there, including the six sweeps, prior findings' triggers and their family
+Phases 1–5 there, including the seven sweeps, prior findings' triggers and their family
 matrices. Carry forward other rows only when all their dependencies remain valid;
 line overlap with a second site alone is insufficient. Search again for newly added
 callers/siblings. Preserve and finish any gaps in the original coverage.
@@ -611,7 +633,7 @@ findings, and the cleared list.
 | **Not reviewed** | N hunks / N commits — and which, or `none` |
 | **Duration** | Nm Ns — N hunks/hour |
 | **Seeds worked** | N constructs · classes A,C,F,H live (B,D,E,G n/a, each with what was searched) |
-| **Sweeps** | post-await N · presence N · effect-order N · second-site N · normalisation N · tests N of N reverted red |
+| **Sweeps** | post-await N · presence N · effect-order N · second-site N · normalisation N · parity N · tests N of N reverted red |
 | **Reuse / families** | N rows reused, N reopened; N family rows resolved, N open; ledger: `<absolute path>` |
 | **Candidates** | N raised → N killed in falsification → **N reported** |
 | **Findings** | 🔴 N critical · 🟠 N high · 🟡 N medium |
@@ -632,7 +654,8 @@ The sweeps row carries instance counts, not adjectives: `post-await 9` means nin
 `await`s were enumerated and each got a verdict. `post-await 0` on a diff full of async
 code is a sweep that was skipped, and it should be visible as one; so is `second-site 0`
 on a diff that writes a row or changes a predicate, and `normalisation 0` on a diff that
-lower-cases, trims, splits, or parses any text a decision later reads. For the test sweep,
+lower-cases, trims, splits, or parses any text a decision later reads, and `parity 0` on
+a diff touching a rule its schema, its client, or its SQL also encodes. For the test sweep,
 report how many of the changed tests were actually run against a reverted hunk — that
 is the only form of the claim that means anything.
 
