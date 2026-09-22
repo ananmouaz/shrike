@@ -87,6 +87,11 @@ Ask these about the report as a whole:
 - Is any finding really a preference wearing a bug costume?
 - If exactly one of these is wrong, which one is it? That one probably is. Re-examine
   it, and delete it unless you can close it.
+- For every clearance of a guard, a compare-and-swap, or a predicate: did I name the
+  conditions under which the protected write *must not happen* — stale snapshot, outside
+  the live window, wrong status, a concurrent writer, a lapsed entitlement, an effect
+  that never landed — and point at the line guarding each, or did I clear all six by
+  observing that the existing predicate is repeated? One mechanism answers one condition.
 - For every "checked and cleared" entry: was it cleared in the context the code
   actually runs in — the state earlier pipeline stages leave behind, the real caller
   set, the real data distribution — or only in isolation? "The math is internally

@@ -780,3 +780,43 @@ rounds of blindness.
 
 **Nothing added to `seeds-and-slicing.md`.** This is a scheduling defect in the reuse
 protocol, not a kind of wrongness in reviewed code.
+
+### Miss — the condition nobody guarded, cleared by the guard for a different condition
+
+**The bug.** A state write was protected by one real mechanism: a compare-and-set whose
+`WHERE` repeated the predicate the decision had been read from. The mechanism works, and
+it answers the condition it was built for — the snapshot the decision came from is no
+longer current. It answers nothing else. A later refresh rewrote the same payload
+*outside the window in which writing was legal at all*, a condition for which no guard
+existed anywhere in the repository.
+
+**What Shrike did instead.** Round 1 listed the race under *Checked and cleared*, with a
+true reason: the compare-and-set repeats its predicates. That sentence closed a question
+that had six parts, and because a chain reuses clearances rather than re-asking them, it
+stayed closed for the rest of the chain.
+
+**Classes that now absorb it.** C (stale state) — one clause: a write guarded only
+against a stale snapshot, landing outside its window or after the target closed. The
+class already owned the staleness half; what was missing is that guarding staleness is
+not guarding the write.
+
+**Why no sweep would have found it.** Every seed in the method starts from something
+present in the diff: a construct grep, a sweep population, a second-site pair. A guard
+that was never written matches no grep, joins no population, and appears in no pair.
+Reading the write recovers only the conditions its author already considered — the same
+set that produced the gap.
+
+**Patches.** The clause above, plus a requirement in Phase 4: before any guard,
+compare-and-swap, or predicate is written into *Checked and cleared*, the conditions
+under which the protected write must not happen are named — stale snapshot; outside the
+live window, including after the target was finalised, settled, cancelled or archived;
+wrong status for the transition; a concurrent writer already there; the actor no longer
+entitled; the recorded effect never landed — and each is shown guarded as `path:line`. A
+condition with no line is a candidate, not a clearance. A condition genuinely
+inapplicable is answered the way a class `n/a` is answered, with what was searched. The
+falsification self-check gained the same question, and the *Checked and cleared* section
+of the report now carries the list rather than the phrase "the predicate is repeated".
+
+**The load-bearing sentence is "one mechanism answers one condition."** A clearance is
+more expensive than a candidate: a candidate that dies is a bug that was already there,
+while a clearance is a promise about a whole area that every later round reuses.

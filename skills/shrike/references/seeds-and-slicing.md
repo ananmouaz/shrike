@@ -105,12 +105,13 @@ value unrepresentable.
 else can change it?
 
 **Shapes:** state captured before an `await` and used after, or an async result applied
-without checking its session or key is still current; a guard reading the source while
-the payload reads a local copy of it; a ref read by a same-turn callback that only updates on the next render; a later pipeline pass judged against the
-original input, not what earlier passes left; a gate on one async source while reading
-another that resolves separately; a draft or expansion flag keyed to an identity that
-changed underneath it; a reset performed in an effect, so the first paint still shows
-the previous state — a leftover *armed* confirm; a terminal or
+without a currency check; a guard reading the source while the payload reads a local
+copy of it; an update landing a render late — a ref read by a same-turn callback, a
+reset in an effect that leaves the first paint stale; a write guarded only against a
+stale snapshot, landing outside its window or after the target closed; a later pipeline
+pass judged against the original input, not what earlier passes left; a gate on one
+async source while reading another that resolves separately; a draft flag keyed to an
+identity that changed underneath it; a terminal or
 in-flight marker never cleared on the early-return path, so the flow cannot be
 re-entered; a write invalidating the obvious query but not
 the sibling views over the same rows; a process-global reset by an older instance's

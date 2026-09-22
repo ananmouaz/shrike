@@ -379,6 +379,32 @@ candidates in one batch.
 **Kill rule:** if you cannot rule out the rebuttal by pointing at code, the finding
 dies. Not "downgraded" — deleted. Do not report it with a hedge.
 
+**Clearing a guard, a compare-and-swap, or a predicate costs more than clearing a
+candidate.** A candidate that dies here is a bug that was already there. A *clearance*
+written here is a promise that a whole area is safe, and a chain reuses it for every
+later round. So before any guard, CAS, or predicate goes under *Checked and cleared*,
+name the conditions under which the write it protects **must not happen**, and show each
+one guarded, as `path:line`:
+
+- the generation, version, or snapshot the decision was read from is stale;
+- the moment is outside the window the write is legal in — before it opens, after it
+  closes, or after the target was finalised, settled, cancelled, or archived;
+- the target is in the wrong status for this transition;
+- a concurrent writer has already made the same or a conflicting write;
+- the actor is no longer entitled — session ended, permission revoked, tenant or scope
+  switched, the record reassigned;
+- the effect the write records never landed.
+
+**One mechanism answers one condition.** "The compare-and-swap repeats the decision's
+predicate" is a true sentence about staleness and says nothing about the window, the
+status, the entitlement, or the confirmation. Repeating the predicate is evidence for
+the condition it is evidence for; as a clearance of the write it is a claim about five
+conditions nobody checked. A condition with no `path:line` is not a clearance — it is a
+candidate, and it re-enters this phase with the rest. A condition genuinely not
+applicable is answered the way a class `n/a` is answered in Phase 2: name what you
+looked for and found absent. "There is no window" is a claim about the schema, and it
+needs the column or the state machine that shows it.
+
 For each candidate, record the strongest rebuttal and the code checked to resolve it.
 Repeat only where that evidence is missing. Zero rejected candidates is possible,
 especially in a fix round; it is not a reason to repeat a completed pass or invent a
@@ -622,7 +648,9 @@ codebase does not have ordering bugs or the hunt is not looking for them.
 ### Checked and cleared
 
 Close with 3–6 things you specifically investigated and ruled out, each with the
-reason — one line each, and name the class where it applies. This is what makes
+reason — one line each, and name the class where it applies. An entry about a guard, a
+compare-and-swap, or a predicate carries its must-not-happen list from Phase 4: the
+reason is the conditions and the line guarding each, never "the predicate is repeated". This is what makes
 zero-finding runs trustworthy instead of looking lazy, and it lets the human spot
 where you looked in the wrong place.
 
