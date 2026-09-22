@@ -152,3 +152,7 @@ flutter test
 ```
 
 Anything `dart analyze` reports is its finding, not yours. Do not restate it.
+
+For the test-power sweep, run only the file a row names — `flutter test
+test/<name>_test.dart` — and add `--plain-name '<test name>'` when one test settles it.
+Never point that run at `test/` or a subdirectory.

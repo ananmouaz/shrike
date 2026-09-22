@@ -116,7 +116,12 @@ PINNED=$(python3 <skill>/scripts/review_snapshot.py --base <base> --pin <scratch
 ```
 
 That builds a detached worktree at HEAD and replays the captured staged, unstaged and
-untracked contents on top. **Read every file and run every check in `$PINNED`.** Touch
+untracked contents on top. It also clones the author's ignored build caches into the pin
+(`.dart_tool`, `node_modules`, `.venv`, `target`; override with `SHRIKE_WARM_DIRS`), so
+the first test run there is warm — a bare pin paid a dependency fetch and a cold compile,
+about 80 seconds, before it had read a line. Do not run `pub get`, `npm install` or their
+equivalents in the pin unless a tool refuses without it. **Read every file and run every
+check in `$PINNED`.** Touch
 the original worktree only at the very end, to recapture it without `--pin` for the
 drift check — and when it has drifted, say so in the *Not reviewed* row and hunt the
 delta; do not discard a round whose evidence is all still valid. Remove the pin when the
@@ -326,6 +331,16 @@ round-trip, not seven.
    fail and the input that reaches it, and check the fixtures actually contain a case
    of the class under test: a setup filter that excludes every input the regression
    would produce is the usual shape, and it reads as a passing test forever.
+   Two rules keep these runs cheap without touching what they prove. **Run only the
+   test file the row names** — `flutter test test/x_test.dart`, `pytest tests/test_x.py`,
+   `vitest run src/x.test.ts` — never a directory: a directory-wide run compiles and
+   executes every file under it to answer one row. **Apply disjoint reverts together.**
+   Reverts whose expected red lands in different test files cannot mask each other:
+   apply them all, run the named files in one command, and read the result per file —
+   red in every expected file kills every row in the batch. A file that stays green, or
+   goes red where no revert should reach, gets its own run; that is the only case that
+   costs a second pass. Two reverts the same test file should catch stay in separate
+   runs, since one red cannot be attributed to two hunks.
 5. **Second site.** The escaped bugs that hurt most name two locations, not one: a
    changed line and an unchanged one it depends on. Sweeps 1–4 draw their populations
    from the diff alone; this one works the pairs Phase 2 step 3 wrote down, and a row

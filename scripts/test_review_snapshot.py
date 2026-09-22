@@ -185,6 +185,29 @@ class SnapshotTests(unittest.TestCase):
         self.assertNotIn(str(pinned), self.git("worktree", "list"))
         self.assertEqual(self.git("worktree", "list").count("\n"), 0)
 
+    def test_pin_warms_ignored_caches_by_copy_and_leaves_the_original_untouched(self):
+        (self.repo / ".gitignore").write_text("ignored.txt\n.dart_tool/\n")
+        (self.repo / "pkg").mkdir()
+        (self.repo / "pkg" / "pubspec.yaml").write_text("name: pkg\n")
+        self.git("add", ".")
+        self.git("commit", "-qm", "ignore caches")
+        cache = self.repo / ".dart_tool"
+        cache.mkdir()
+        (cache / "package_config.json").write_text("{}\n")
+        nested = self.repo / "pkg" / ".dart_tool"
+        nested.mkdir()
+        (nested / "kernel.dill").write_bytes(b"\x00")
+        pinned = self.run_pin(self.root / "pinned")
+        copied = pinned / ".dart_tool" / "package_config.json"
+        self.assertEqual(copied.read_text(), "{}\n")
+        self.assertTrue((pinned / "pkg" / ".dart_tool" / "kernel.dill").exists())
+        # Newer than the checkout, so the tool's freshness check keeps it.
+        self.assertGreaterEqual(copied.stat().st_mtime, (pinned / "pkg" / "pubspec.yaml").stat().st_mtime)
+        # A copy, not a hard link: the hunt's compiler must never write into the author's cache.
+        copied.write_text("rewritten\n")
+        self.assertEqual((cache / "package_config.json").read_text(), "{}\n")
+        self.assertEqual(self.git("status", "--porcelain"), "")
+
     def test_pin_refuses_a_nonempty_directory_and_the_worktree_itself(self):
         occupied = self.root / "occupied"
         occupied.mkdir()

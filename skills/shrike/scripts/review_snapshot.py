@@ -14,6 +14,9 @@ stderr. The author commits while the hunt runs; without a pin, the recapture at
 the end no longer matches and the whole round is voided after it has paid for its
 checks. Hunt in the pinned tree; recapture the ORIGINAL worktree, without --pin,
 only at the end, and report the drift rather than discarding the round.
+The pin also clones the author's gitignored build caches (SHRIKE_WARM_DIRS,
+default ".dart_tool node_modules .venv target") so its first test run is warm
+instead of paying a dependency fetch and a cold compile.
 --unpin DIR removes that worktree.
 """
 
@@ -22,6 +25,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import stat
 import subprocess
 import sys
@@ -136,7 +140,56 @@ def pin(root, target, state, bundle):
         destination.write_bytes((bundle / "untracked" / identity["sha256"]).read_bytes())
         if identity["executable"]:
             destination.chmod(destination.stat().st_mode | 0o111)
+    warm(root, target)
     return target
+
+
+WARM_DIRS = set(os.environ.get("SHRIKE_WARM_DIRS", ".dart_tool node_modules .venv target").split())
+
+
+def clone(source, destination):
+    """Copy a directory, sharing blocks where the filesystem can (APFS, btrfs, xfs).
+
+    A copy, never a hard link: a compiler rewriting a cache file in place inside
+    the pin would otherwise edit the author's tree through the shared inode.
+    """
+    flags = ["-Rc"] if sys.platform == "darwin" else ["-R", "--reflink=auto"]
+    try:
+        subprocess.run(["cp", *flags, str(source), str(destination)], check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.CalledProcessError):
+        shutil.rmtree(destination, ignore_errors=True)
+        shutil.copytree(source, destination, symlinks=True, copy_function=shutil.copyfile)
+
+
+def warm(root, target):
+    """Clone the reviewed tree's ignored build caches into the pin.
+
+    `worktree add` leaves ignored directories behind, so a bare pin pays `pub get`
+    plus a cold compile (about 80 seconds on a Flutter project) before its first
+    test runs. Every match is an ignored directory, so nothing tracked is duplicated.
+    """
+    if not WARM_DIRS:
+        return
+    listing = git("ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z")
+    for entry in listing.split(b"\0"):
+        relative = os.fsdecode(entry).rstrip("/")
+        if not relative or Path(relative).name not in WARM_DIRS:
+            continue
+        source, destination = root / relative, target / relative
+        if source.is_symlink() or not source.is_dir() or destination.exists():
+            continue
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        clone(source, destination)
+        # The copy must read as newer than the fresh checkout beside it, or the
+        # tool's own staleness check (pub compares package_config.json against
+        # pubspec.lock) discards the cache it was given.
+        for directory, _, names in os.walk(destination):
+            for name in names:
+                try:
+                    os.utime(os.path.join(directory, name), None, follow_symlinks=False)
+                except OSError:
+                    pass
 
 
 def unpin(target):

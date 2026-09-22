@@ -38,7 +38,7 @@ For each candidate, in order:
   guarantee; do not assume one exists because it usually does.
 - **Already tested.** A test covers this exact case. Find it and read it — a test with
   a matching *name* that does not actually assert the behavior is not a rebuttal. The
-  decisive form: revert the production hunk and run that test. Still green means it was
+  decisive form: revert the production hunk and run that test file alone. Still green means it was
   never a rebuttal, and the test itself is now a second finding.
 - **Intentional.** A comment, a config, or a domain rule says this is deliberate. If
   intentional but still dangerous, it is at most Medium and must be framed as such.

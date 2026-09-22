@@ -116,7 +116,9 @@ Repeated reviews use three mechanisms without changing the finding threshold:
 - **Hunt from a tree that can't move.** `--pin <dir>` builds a detached worktree at HEAD
   and replays the captured dirty state on top; the hunt reads and runs checks there, and
   the original worktree is recaptured only at the end. The author committing mid-hunt
-  then costs a *Not reviewed* row instead of the whole round. `--unpin <dir>` removes it.
+  then costs a *Not reviewed* row instead of the whole round. The pin also clones the
+  author's ignored build caches (`.dart_tool`, `node_modules`, `.venv`, `target`, set
+  `SHRIKE_WARM_DIRS` to change) so its first test run is warm. `--unpin <dir>` removes it.
 - **Separate hunts from confirmations.** A confirmation verifies the previous hunt's
   fixes — fix delta, family matrix rows, named regression tests, changed files' tests,
   surface typecheck — and runs no full suites and no full sweeps. It can close findings
