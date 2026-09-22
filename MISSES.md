@@ -934,3 +934,31 @@ replay them; the manifest version moved to 2, which retires old cache entries ra
 than letting a pin find them incomplete.
 
 **Nothing added to `seeds-and-slicing.md`.**
+
+### Miss — every round priced as if it were a hunt
+
+**The shape.** A chain alternates between hunting and verifying a fix, and the method
+had one word for both. Half the rounds in one measured chain were confirmations of the
+previous round's one-line fix, and each ran the full API, admin and mobile suites to
+prove it. Those rounds also spent the round budget, so a chain could exhaust
+`SHRIKE_MAX_ROUNDS` having hunted twice.
+
+**Why this is a recall problem and not a tidiness one.** Cost is a recall lever: a hunt
+people skip because it is slow has a recall of zero on everything it skipped. Paying
+full price to re-verify one line makes the next hunt less likely to happen.
+
+**Patch — name the two kinds and budget only one (`SKILL.md`,
+`references/review-reuse.md`).** A **hunt** runs Phases 1–5 over its scope with all
+seven sweeps, their instance lists, the full suites, and a fresh verdict on every row.
+A **confirmation** verifies the previous hunt's fixes, with a scope that is fixed rather
+than judged: the fix delta, the family matrix rows of the findings being closed, the
+named regression tests for those findings, the tests of the changed files, and a surface
+typecheck. No full suites, no full sweeps.
+
+A confirmation may close findings and may raise new ones out of the fix delta — a fix is
+unreviewed code written under pressure at a place already known to be delicate. It may
+never return a clean verdict for the chain, because it did not look at the chain.
+Because it proves less, it costs less and counts for less: it does not spend
+`SHRIKE_MAX_ROUNDS` and does not age the drift budget. The run record carries
+`kind: hunt|confirmation` and `hunts_in_chain`, the report's *Reviewed* row names the
+kind, and a round that widens beyond the fixed scope is a hunt and is recorded as one.

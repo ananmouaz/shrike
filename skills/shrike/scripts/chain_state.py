@@ -9,7 +9,8 @@ writes, finds the last FULL hunt of the chain, and reports the drift since it:
 
   * `hunks_since_full` — hunks changed between that round's head and the current
     tree, working-tree edits included;
-  * `rounds_since_full` — records written since it.
+  * `rounds_since_full` — HUNTS recorded since it; a confirmation round verifies
+    the previous hunt's fixes and does not age the chain.
 
 A full re-read is required when the drift exceeds `--max-drift-pct` of the hunk
 count the last full hunt covered, or when `--max-rounds-since-full` rounds have
@@ -119,7 +120,10 @@ def assess(chain, max_drift_pct, max_rounds):
     anchor = chain[anchor_at]
     inferred = anchor.get("full_hunt") is not True
 
-    rounds_since = len(chain) - anchor_at - 1
+    # A confirmation round verifies the previous hunt's fixes; it neither re-reads
+    # anything nor spends the budget, so it does not age the chain. A record with no
+    # `kind` predates the field and was a hunt.
+    rounds_since = sum(1 for row in chain[anchor_at + 1:] if row.get("kind") != "confirmation")
     head = anchor.get("head")
     if head:
         hunks_since = count_hunks((f"{head}..HEAD",), ("HEAD",))
@@ -137,7 +141,7 @@ def assess(chain, max_drift_pct, max_rounds):
             f"({hunks_since} of {target}, limit {max_drift_pct}%)"
         )
     if rounds_since >= max_rounds:
-        reasons.append(f"{rounds_since} rounds since the last full hunt (limit {max_rounds})")
+        reasons.append(f"{rounds_since} hunts since the last full hunt (limit {max_rounds})")
     if target is None and hunks_since:
         reasons.append(
             f"the last full hunt recorded no hunk count, so {hunks_since} hunks of drift "

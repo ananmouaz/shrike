@@ -189,6 +189,27 @@ pending verification. Zero **new** findings on a partial delta is not clean. Do 
 write a covering run record for a partial or moving target where a push gate treats
 that record as permission to push. Recheck the snapshot immediately before logging.
 
+A round is a **hunt** or a **confirmation**, and the two are not interchangeable.
+
+A **hunt** runs Phases 1–5 over its scope with all seven sweeps, their instance lists,
+the full suites, and a fresh verdict on every row it touches. A **confirmation** checks
+the previous hunt's fixes and stops there. Its scope is fixed rather than judged: the fix
+delta, the family matrix rows of each finding being closed, the named regression tests
+for those findings, the tests of the changed files, and a surface typecheck. No full
+suites, no full sweeps.
+
+A confirmation may close findings, and it may raise new ones out of the fix delta — a
+fix is unreviewed code written under pressure at a place already known to be delicate.
+What it may never do is return a clean verdict for the chain, because it did not look at
+the chain. Clean requires a hunt, under the conditions below.
+
+Because a confirmation proves less, it costs less and it counts for less: it does not
+spend `SHRIKE_MAX_ROUNDS`, and it does not age the drift budget in `chain_state.py`. The
+budget counts hunts — `hunts_in_chain` in the run record. Half the rounds in one measured
+chain were confirmations of a one-line fix, each re-running three full suites to prove
+it; that is the cost this split removes. A round that widens beyond the fixed scope
+above is a hunt, and is recorded as one.
+
 `SHRIKE_MAX_ROUNDS` is a handoff budget, not a quality criterion. Respect a project's
 explicit continuation policy; never treat hitting the cap as a clean result. Count
 rounds in this review chain, not every historical run on a long-lived branch (the

@@ -103,7 +103,23 @@ class ChainStateTests(unittest.TestCase):
         self.assertEqual(state["hunks_since_full"], 0)
         self.assertEqual(state["rounds_since_full"], 3)
         self.assertTrue(state["full_hunt_required"])
-        self.assertIn("3 rounds since the last full hunt", state["reason"])
+        self.assertIn("3 hunts since the last full hunt", state["reason"])
+
+    def test_confirmation_rounds_do_not_age_the_chain(self):
+        self.round_one()
+        for n in (2, 3, 4, 5):
+            self.record(round=n, kind="confirmation", full_hunt=False)
+        state, _ = self.state()
+        self.assertEqual(state["rounds_since_full"], 0)
+        self.assertFalse(state["full_hunt_required"])
+
+        self.record(round=6, kind="hunt", full_hunt=False)
+        self.record(round=7, kind="hunt", full_hunt=False)
+        self.record(round=8, kind="hunt", full_hunt=False)
+        state, _ = self.state()
+        self.assertEqual(state["rounds_since_full"], 3)
+        self.assertTrue(state["full_hunt_required"])
+        self.assertIn("3 hunts since the last full hunt", state["reason"])
 
     def test_uncommitted_edits_count_toward_the_drift(self):
         self.round_one()

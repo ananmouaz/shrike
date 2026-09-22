@@ -620,8 +620,31 @@ be treated as a tiny fix review. Record reused/reopened coverage in the header. 
 inputs and evidence are unchanged and coverage is complete, return the prior verdict
 without launching another hunt. Open findings remain open until independently verified.
 
+**Two kinds of round, and only one of them is budgeted.**
+
+A **hunt** is everything this document describes: Phases 1–5 over its scope, all seven
+sweeps with their instance lists, the full suites, a fresh verdict on every row it
+touches. Round 1 is a hunt. So is any round that follows a new push, and so is the
+periodic full re-read.
+
+A **confirmation** verifies the previous hunt's fixes and nothing else. Its scope is
+fixed, not judged: the **fix delta** (the diff of the fixes themselves, which is
+unreviewed code written under time pressure at exactly the delicate places — Phase 1's
+caller enumeration still applies to any contract the fix changed), the **family matrix**
+rows of each finding it closes, the **named regression tests** for those findings, the
+tests of the **changed files**, and a **surface typecheck**. It runs no full suites and
+no full sweeps. It may close findings and it may raise new ones from the fix delta; what
+it may not do is report a clean chain, because it did not look at one.
+
+Half the rounds in one measured chain were confirmations of a one-line fix, each
+re-running three full suites for it. A confirmation is cheap on purpose, and the cost of
+making it cheap is that it proves less — so it **does not count toward
+`SHRIKE_MAX_ROUNDS`**, and it does not age the chain's drift budget either. The budget
+counts hunts, which is what `hunts_in_chain` records. A round that widens its scope
+beyond the list above is a hunt; call it one and spend the budget.
+
 **The loop is bounded.** Hunt, fix or hand off, re-hunt the delta — at most
-`SHRIKE_MAX_ROUNDS` rounds, default 3, unless the project explicitly requires further
+`SHRIKE_MAX_ROUNDS` **hunts**, default 3, unless the project explicitly requires further
 rounds. Count this review chain in its ledger; the legacy `report_stats.sh` round
 number counts historical branch records and is not a chain budget.
 When the cap is reached, stop, whatever is still open, and make the report say so: the
@@ -650,7 +673,7 @@ findings, and the cleared list.
 | | |
 |---|---|
 | **Target** | `<branch or PR>` · `<base>...<head>` |
-| **Reviewed** | N files, N hunks, N callers outside the diff, N peers compared — round N of M, full re-read: yes/no: `<prev>..<head>`, N hunks since, N since last full hunt |
+| **Reviewed** | N files, N hunks, N callers outside the diff, N peers compared — kind: hunt/confirmation · hunt N of M, full re-read: yes/no: `<prev>..<head>`, N hunks since, N since last full hunt |
 | **Not reviewed** | N hunks / N commits — and which, or `none` |
 | **Duration** | Nm Ns — N hunks/hour |
 | **Seeds worked** | N constructs · classes A,C,F,H live (B,D,E,G n/a, each with what was searched) |
@@ -662,9 +685,11 @@ findings, and the cleared list.
 
 The verdict line is one sentence: either `N findings — <the worst one in six words>`
 or `no correctness bugs found that meet the evidence bar`. The round clause on the
-*Reviewed* row appears from round 2 on, and carries `full re-read: yes` whenever the
-round re-hunted the whole original target — `log_run.sh` reads both it and the
-`N since last full hunt` figure out of that row; when the round cap ended the loop with candidates
+*Reviewed* row appears from round 2 on. It names the round's `kind:` — a confirmation
+says which hunt's fixes it verified and lists what it checked, never a hunk count it did
+not work — and carries `full re-read: yes` whenever the round re-hunted the whole
+original target. `log_run.sh` reads the kind, the `N since last full hunt` figure and
+the full-re-read flag out of that row, and derives `hunts_in_chain` from the kind; when the round cap ended the loop with candidates
 still unfixed, an **Open** list follows the findings, one line each.
 
 The candidates row is what makes the report trustworthy. A run that raised 14 and
