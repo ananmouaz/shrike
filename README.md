@@ -73,16 +73,26 @@ tries to prove itself wrong.
 3. **Ask a fixed list of questions.** Not "look for bugs" (which has no finish line, so
    the model stops when it gets bored and starts inventing). A bounded set of specific
    questions that reading code answers yes or no. When they're answered, the pass is over.
-   Four families are *per instance* rather than per change, so they're worked as
+   Seven families are *per instance* rather than per change, so they're worked as
    enumerations with a verdict on every row: every `await` followed by a use of state
    captured before it, every guard deciding whether a value was supplied, every effect
-   registered relative to its only reader, and every test the diff touched — reverted and
-   re-run, because a test that still passes with the fix removed is certifying nothing.
+   registered relative to its only reader, every test the diff touched — reverted and
+   re-run, because a test that still passes with the fix removed is certifying nothing —
+   every pair of a changed line and the unchanged one it depends on, every transform of
+   user text against a fixed input set and the consumer comparing its output, and every
+   rule that exists in two layers, both texts quoted side by side and walked across `0`,
+   `0.5`, `null`, empty and max.
 4. **Then turn hostile.** Switch sides and attack every candidate finding: is there a
    guard upstream? A type that makes the bad value impossible? A framework guarantee? A
    test that already covers it? **If the rebuttal can't be closed by pointing at actual
    code, the finding is deleted.** Not softened, not marked "low confidence." Deleted.
    Each candidate needs an evidenced rebuttal check. Rejection counts are not a quota.
+   Clearing a guard costs more than killing a candidate, because a chain reuses a
+   clearance: before any guard, compare-and-swap or predicate is written down as
+   cleared, the conditions under which the write *must not happen* are named — stale
+   snapshot, outside the live window, wrong status, a concurrent writer, a lapsed
+   entitlement, an effect that never landed — and each is shown guarded, with a line.
+   One mechanism answers one condition.
 5. **Prove what's left.** Ideally by writing a failing test and running it. If the test
    passes, the finding was wrong — delete it.
 6. **Report at most five things**, and show the body count.
@@ -103,6 +113,20 @@ Repeated reviews use three mechanisms without changing the finding threshold:
   includes staged/unstaged/untracked edits, not just HEAD. Pass the bundle and raw
   caller/peer/provider evidence to the next reviewer. Add `--dependency FILE` for
   ignored or external inputs; the helper does not validate live services or env state.
+- **Hunt from a tree that can't move.** `--pin <dir>` builds a detached worktree at HEAD
+  and replays the captured dirty state on top; the hunt reads and runs checks there, and
+  the original worktree is recaptured only at the end. The author committing mid-hunt
+  then costs a *Not reviewed* row instead of the whole round. `--unpin <dir>` removes it.
+- **Separate hunts from confirmations.** A confirmation verifies the previous hunt's
+  fixes — fix delta, family matrix rows, named regression tests, changed files' tests,
+  surface typecheck — and runs no full suites and no full sweeps. It can close findings
+  and raise new ones; it can never call the chain clean. It doesn't spend the round
+  budget, which counts hunts.
+- **Re-read the whole target on a schedule.** Delta rounds reuse clearances, so a wrong
+  one is permanent. `python3 skills/shrike/scripts/chain_state.py --explain` measures the
+  drift since the last full hunt; past 20% of its hunks or three hunts, the next round
+  re-hunts the whole original target **with the prior ledger's verdicts hidden** —
+  coverage rows for scope, never for answers.
 - **Review the affected dependency slice at full depth.** Fresh reviewers receive a
   coverage ledger and independently check changed behavior, previous triggers and
   siblings. Unchanged clearances survive only with validated dependencies. Missing
@@ -114,7 +138,7 @@ delta is not clearance. The default three-round budget is a handoff limit, not p
 of correctness, and explicit project continuation rules take precedence.
 
 See [the reuse protocol](skills/shrike/references/review-reuse.md). Validate the helper
-with `python3 scripts/test_review_snapshot.py -v` and rebuild the portable prompt with
+with `python3 -m unittest discover -s scripts -v` and rebuild the portable prompt with
 `bash scripts/build_portable.sh`. These checks verify snapshot behavior, not reviewer
 recall. Measure total review/fix time and escaped bugs on comparable changes before
 claiming a speedup with equal quality.
@@ -202,7 +226,7 @@ it can run this.
 | `adapters/` | Drop-in wiring for `AGENTS.md`-convention agents |
 | `commands/` | `/shrike-review` slash command for Claude Code |
 | `templates/` | Starter `review-rules.md` and a GitHub Actions workflow |
-| `skills/shrike/scripts/` | The deterministic bits: analyzer pass, measured report stats, PR-comment upsert that also writes the JSONL run record |
+| `skills/shrike/scripts/` | The deterministic bits: analyzer pass, measured report stats, PR-comment upsert that also writes the JSONL run record, snapshot/pin helper, chain drift helper |
 | `scripts/build_portable.sh` | Rebuilds `dist/` from `skills/` so the two don't drift |
 | `assets/` | Logo, README illustration, social-preview card |
 | `MISSES.md` | The ledger — every bug Shrike missed, why, and what changed as a result |
