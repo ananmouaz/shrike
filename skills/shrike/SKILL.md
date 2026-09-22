@@ -497,6 +497,24 @@ understanding is already loaded. The same holds for a rollup or integration pull
 request: it is a distinct diff against a distinct base, and reviewing each contributing
 branch is not reviewing their merge.
 
+**A chain that only ever hunts deltas never revisits round 1.** Rounds after the first
+reuse the prior ledger, so a row round 1 cleared wrongly is never looked at again — in
+one measured chain, round 12 reused 230 of 236 rows and carried a wrong clearance from
+round 1 to the end. Before scoping a round, ask how far the chain has drifted from its
+last full hunt:
+
+```bash
+python3 <skill>/scripts/chain_state.py --explain
+```
+
+When the drift exceeds **20% of the hunks the last full hunt covered**, or **three
+rounds** have passed since it, the next round must **re-hunt the whole original target
+with the prior ledger's verdicts hidden**. Coverage rows may still be read for scope —
+which files, which pairs, which populations — never for their answers: every seed, sweep
+row and second site is worked again and gets a fresh verdict. Stamp the round
+`full re-read: yes` in the *Reviewed* row so the record carries `full_hunt` and
+`hunks_since_full`, which is what resets the drift the helper measures.
+
 **A round after the first reviews the affected dependency slice.** Round 1 covers the
 original target plus staged, unstaged and untracked changes. Round N compares the
 current snapshot with the prior ledger, then follows changed producers, callers,
@@ -542,7 +560,7 @@ findings, and the cleared list.
 | | |
 |---|---|
 | **Target** | `<branch or PR>` · `<base>...<head>` |
-| **Reviewed** | N files, N hunks, N callers outside the diff, N peers compared — round N of M: `<prev>..<head>`, N hunks since |
+| **Reviewed** | N files, N hunks, N callers outside the diff, N peers compared — round N of M, full re-read: yes/no: `<prev>..<head>`, N hunks since, N since last full hunt |
 | **Not reviewed** | N hunks / N commits — and which, or `none` |
 | **Duration** | Nm Ns — N hunks/hour |
 | **Seeds worked** | N constructs · classes A,C,F,H live (B,D,E,G n/a, each with what was searched) |
@@ -554,7 +572,9 @@ findings, and the cleared list.
 
 The verdict line is one sentence: either `N findings — <the worst one in six words>`
 or `no correctness bugs found that meet the evidence bar`. The round clause on the
-*Reviewed* row appears from round 2 on; when the round cap ended the loop with candidates
+*Reviewed* row appears from round 2 on, and carries `full re-read: yes` whenever the
+round re-hunted the whole original target — `log_run.sh` reads both it and the
+`N since last full hunt` figure out of that row; when the round cap ended the loop with candidates
 still unfixed, an **Open** list follows the findings, one line each.
 
 The candidates row is what makes the report trustworthy. A run that raised 14 and

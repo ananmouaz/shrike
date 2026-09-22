@@ -17,6 +17,7 @@
 #       without its record.
 #   log_run.sh --pr N --candidates N --killed N --reported N [--findings STR]
 #              [--sweeps STR] [--unreviewed STR] [--target STR] [--base REF] [--note STR]
+#              [--full-hunt yes|no] [--hunks-since-full N]
 #       Same record, numbers given by hand (a run with no report file).
 #   log_run.sh --last            # head SHA of the newest record for this repo + branch
 #   log_run.sh --last --any      # ... for this repo, any branch
@@ -32,6 +33,7 @@
 #
 # Record fields, fixed order, one object per line:
 #   ts repo branch pr target head base range prev_head files hunks secs round
+#   full_hunt hunks_since_full
 #   candidates killed reported severity{critical,high,medium}
 #   sweeps{post_await,presence,effect_order,second_site,tests_run,tests_red}
 #   unreviewed note
@@ -43,6 +45,7 @@ LOG="${SHRIKE_LOG:-$STATE_HOME/shrike/runs.jsonl}"
 
 PR=""; TARGET=""; BASE=""; CAND=""; KILLED=""; REPORTED=""
 FINDINGS=""; SWEEPS=""; UNREVIEWED=""; NOTE=""; REPORT=""; ROUND=""
+FULL=""; HSF=""
 MODE="append"; SCOPE="branch"
 
 while [ $# -gt 0 ]; do
@@ -52,6 +55,8 @@ while [ $# -gt 0 ]; do
     --target)      TARGET="${2:-}"; shift 2 ;;
     --base)        BASE="${2:-}"; shift 2 ;;
     --round)       ROUND="${2:-}"; shift 2 ;;
+    --full-hunt)   FULL="${2:-}"; shift 2 ;;
+    --hunks-since-full) HSF="${2:-}"; shift 2 ;;
     --candidates)  CAND="${2:-}"; shift 2 ;;
     --killed)      KILLED="${2:-}"; shift 2 ;;
     --reported)    REPORTED="${2:-}"; shift 2 ;;
@@ -98,6 +103,13 @@ num() {  # JSON number or null
   esac
 }
 str() { printf '"%s"' "$(esc "$1")"; }
+bool() {  # JSON true/false, or null when neither was stated
+  case "$(printf '%s' "${1:-}" | tr 'A-Z' 'a-z')" in
+    yes|true|y|1)  printf 'true' ;;
+    no|false|n|0)  printf 'false' ;;
+    *)             printf 'null' ;;
+  esac
+}
 opt() { [ -n "${1:-}" ] && str "$1" || printf 'null'; }
 
 # Match records of this repo (and branch) without depending on jq. The writer below
@@ -148,6 +160,9 @@ if [ -n "$REPORT" ]; then
   SROW=$(row_cell "Sweeps" "$REPORT")
   [ -n "$SWEEPS" ] || SWEEPS="$SROW"
   [ -n "$UNREVIEWED" ] || UNREVIEWED=$(row_cell "Not reviewed" "$REPORT")
+  RROW=$(row_cell "Reviewed" "$REPORT")
+  [ -n "$FULL" ] || FULL=$(printf '%s\n' "$RROW" | grep -oiE 'full re-read: ?(yes|no)' | head -1 | grep -oiE '(yes|no)$')
+  [ -n "$HSF" ]  || HSF=$(printf '%s\n' "$RROW" | grep -oE '[0-9]+ since last full hunt' | head -1 | grep -oE '^[0-9]+')
   TROW=$(row_cell "Target" "$REPORT")
   [ -n "$PR" ] || PR=$(printf '%s\n' "$TROW" | grep -oE 'PR #[0-9]+' | head -1 | tr -dc '0-9')
   [ -n "$TARGET" ] || TARGET=$(printf '%s\n' "$TROW" | sed -E 's/^`([^`]*)`.*/\1/')
@@ -210,11 +225,11 @@ fi
 [ -n "$TARGET" ] || TARGET=$([ -n "$PR" ] && echo "PR #$PR" || echo "$BRANCH")
 
 # --- the record --------------------------------------------------------------
-LINE=$(printf '{"ts":%s,"repo":%s,"branch":%s,"pr":%s,"target":%s,"head":%s,"base":%s,"range":%s,"prev_head":%s,"files":%s,"hunks":%s,"secs":%s,"round":%s,"candidates":%s,"killed":%s,"reported":%s,"severity":{"critical":%s,"high":%s,"medium":%s},"sweeps":{"post_await":%s,"presence":%s,"effect_order":%s,"second_site":%s,"tests_run":%s,"tests_red":%s},"unreviewed":%s,"note":%s}' \
+LINE=$(printf '{"ts":%s,"repo":%s,"branch":%s,"pr":%s,"target":%s,"head":%s,"base":%s,"range":%s,"prev_head":%s,"files":%s,"hunks":%s,"secs":%s,"round":%s,"full_hunt":%s,"hunks_since_full":%s,"candidates":%s,"killed":%s,"reported":%s,"severity":{"critical":%s,"high":%s,"medium":%s},"sweeps":{"post_await":%s,"presence":%s,"effect_order":%s,"second_site":%s,"tests_run":%s,"tests_red":%s},"unreviewed":%s,"note":%s}' \
   "$(str "$(date -u +%Y-%m-%dT%H:%M:%SZ)")" "$(str "$REPO")" "$(str "$BRANCH")" \
   "$(num "$PR")" "$(str "$TARGET")" "$(opt "$HEAD_SHA")" "$(opt "$BASE_SHA")" \
   "$(opt "$RANGE")" "$(opt "$PREV_HEAD")" "$(num "$FILES")" "$(num "$HUNKS")" \
-  "$(num "$SECS")" "$(num "$ROUND")" "$(num "$CAND")" "$(num "$KILLED")" "$(num "$REPORTED")" \
+  "$(num "$SECS")" "$(num "$ROUND")" "$(bool "$FULL")" "$(num "$HSF")" "$(num "$CAND")" "$(num "$KILLED")" "$(num "$REPORTED")" \
   "$(num "$SEV_C")" "$(num "$SEV_H")" "$(num "$SEV_M")" \
   "$(num "$S_POST")" "$(num "$S_PRES")" "$(num "$S_EFF")" "$(num "$S_SITE")" \
   "$(num "$S_TRUN")" "$(num "$S_TRED")" \

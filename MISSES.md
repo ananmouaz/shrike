@@ -734,3 +734,49 @@ classes, none above twelve clauses or ~180 words. The file leaves at ~3,164 — 
 over the backstop, all of it in the four widened construct rows, after trimming six
 verbose clauses to pay for them. The per-class controls held; the total did not, and
 that is recorded rather than the cap being moved.
+
+---
+
+## Study 7 — 98 findings that landed after a chain returned clean
+
+One monorepo, one week, 24 pull requests. On each, a Shrike chain of up to fourteen
+rounds had closed clean; afterwards commercial reviewers posted 98 findings against the
+same code. The two largest classes were wrong condition (32) and race or post-await
+state (11). The entries below are the shapes behind them. Each patch is a *step* or a
+*tool*, not a new class — the taxonomy stays at eight.
+
+### Miss — a wrong clearance is permanent once the chain starts reusing it
+
+**The shape.** Not a defect shape: a *method* shape, and it multiplies every other miss
+in this study. A round after the first hunts `<previous head>..HEAD` and reuses the
+prior coverage ledger, which is what makes a chain affordable. It also means a row is
+reused rather than re-asked. In one chain, round 12 reused 230 of 236 rows. Round 1 had
+cleared a race, the clearance was wrong, and no round between 2 and 14 had any reason to
+open it again — the row's dependencies never changed, so dependency invalidation, which
+is the only mechanism that reopens rows, correctly left it alone. The verdict was wrong
+when it was written, and nothing in the method re-reads a verdict.
+
+**Why the method missed it.** Everything about reuse was working as designed. The gap is
+that "reuse unchanged coverage" had no expiry, so the chain's confidence in round 1 grew
+with every round that did not test it.
+
+**Patch — a drift budget and a periodic full re-read (`chain_state.py`,
+`references/review-reuse.md`, `SKILL.md` Phase 7).** A new helper reads the run records,
+anchors on the last round recorded `full_hunt: true`, and measures the drift since it:
+`hunks_since_full`, counted from that round's head to the current tree with
+working-tree edits included, and the rounds recorded after it. The next round must be a
+**full re-read** when the drift exceeds 20% of the hunk count the anchoring round
+covered, or when three rounds have passed. Records predating the fields never anchor;
+the chain's first record does, since round 1 hunts the whole target by definition.
+
+The distinction that makes the re-read worth its cost: it re-hunts the whole original
+target **with the prior ledger's verdicts hidden**. Coverage rows are still read for
+scope — which files, which second-site pairs, which sweep populations, what was left
+unreviewed — and never for their answers. A full re-read that reuses verdicts is a delta
+round with a longer header. `full_hunt` and `hunks_since_full` go in the ledger header
+and the run record, and only a round that actually re-read everything may write
+`full_hunt: true`: it resets the drift, so a false one buys the chain another twenty
+rounds of blindness.
+
+**Nothing added to `seeds-and-slicing.md`.** This is a scheduling defect in the reuse
+protocol, not a kind of wrongness in reviewed code.
