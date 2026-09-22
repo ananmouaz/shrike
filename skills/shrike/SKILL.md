@@ -105,6 +105,27 @@ read their output before forming any hypothesis:
 scripts/static_pass.sh [path]
 ```
 
+**Hunt from a fixed tree, not from the author's.** The author keeps working while you
+hunt: a commit, a rebase, a stash, a formatter on save. Every one of those makes the
+recapture at the end disagree with the snapshot, and the round is voided *after* it has
+paid for the full test suites — six of fourteen rounds in one measured chain died that
+way. Pin the tree once, at the start:
+
+```bash
+PINNED=$(python3 <skill>/scripts/review_snapshot.py --base <base> --pin <scratch>/tree)
+```
+
+That builds a detached worktree at HEAD and replays the captured staged, unstaged and
+untracked contents on top. **Read every file and run every check in `$PINNED`.** Touch
+the original worktree only at the very end, to recapture it without `--pin` for the
+drift check — and when it has drifted, say so in the *Not reviewed* row and hunt the
+delta; do not discard a round whose evidence is all still valid. Remove the pin when the
+round closes:
+
+```bash
+python3 <skill>/scripts/review_snapshot.py --unpin <scratch>/tree
+```
+
 For repeated/concurrent runs, set `SHRIKE_START_FILE` to an absolute path in this
 review chain's scratch directory and pass it to each tool call. Reuse a deterministic
 result only with matching inputs, command, tool version and environment as defined

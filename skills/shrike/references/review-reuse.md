@@ -59,6 +59,21 @@ for ignored/external inputs used as evidence, including installed provider sourc
 review instructions, or local config. For a symlink, add its resolved target as a
 dependency as well. Never cache secret values in prose or paste the bundle publicly.
 
+Add `--pin <dir>` to that command to hunt from a tree that cannot move. It builds a
+detached worktree at HEAD in `<dir>`, replays the captured staged, unstaged and
+untracked contents on top, prints the pinned path on stdout and the bundle path on
+stderr; `--unpin <dir>` removes it. Read files and run checks in the pinned tree for the
+whole round, and recapture the **original** worktree, without `--pin`, only at the end.
+
+This is a cost rule, not a correctness one. A moving original tree used to void a round
+retroactively: the author committed mid-hunt, the recapture no longer matched, and the
+round was discarded after it had already run the full suites — six of fourteen rounds in
+one measured chain. With a pin, the original may move as much as it likes and costs
+nothing until the final recapture. A drift found there is a *result*: name the delta in
+the report's *Not reviewed* row, or hunt it, but do not throw away evidence that is
+still true of the tree it was read from. The pinned tree is what the report's range
+describes.
+
 The snapshot key includes the worktree, base ref and tip, merge-base, HEAD, index,
 tracked edits, and nonignored untracked contents. **HEAD alone is not a cache key.**
 Repeat the same command before recording: a different directory means the inputs

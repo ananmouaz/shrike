@@ -902,3 +902,35 @@ a pair even when the diff changed only one side, which is what separates it from
 drops NULL rows while the JavaScript twin keeps them. Flutter/Dart: a form `validator:`
 and the server constraint are one rule in two places, and the disagreement stays hidden
 for as long as the app is the only writer.
+
+### Miss — a round voided by the author's commit, after it had paid for everything
+
+**The shape.** Not a defect in reviewed code: a defect in the review's own accounting.
+The snapshot protocol captures the worktree at the start and recaptures it before
+recording, and a different capture means the inputs moved. That check is correct, and
+the response to it was not: the round was voided. In one chain, six of fourteen rounds
+produced no report at all because the author committed while the hunt ran. Each had
+already read the diff, worked the sweeps, and run the full API, admin and mobile
+suites. All of that evidence was still true of the tree it had been read from; none of
+it reached a report.
+
+**Why the response was wrong.** The recapture answers "does the original worktree still
+match?", and the round was treating that as "is this round's evidence valid?". Those are
+different questions. Evidence read from a tree stays true of that tree. What the drift
+actually means is that the *report's range* no longer covers the branch — which is a
+*Not reviewed* row, the same as any other unhunted delta, not a reason to discard the
+work.
+
+**Patch — `--pin` and `--unpin` (`review_snapshot.py`).** `--pin <dir>` builds a
+detached worktree at HEAD and replays the captured staged, unstaged and untracked
+contents on top, printing the pinned path. The hunt reads files and runs checks there
+for the whole round; the original worktree is recaptured, without `--pin`, only at the
+end. The original may then move as much as it likes and costs nothing until that last
+step, and drift found there is reported as a delta rather than used to void the round.
+`--unpin <dir>` removes the worktree.
+
+The bundle now stores untracked file contents as content-addressed blobs so a pin can
+replay them; the manifest version moved to 2, which retires old cache entries rather
+than letting a pin find them incomplete.
+
+**Nothing added to `seeds-and-slicing.md`.**
