@@ -820,3 +820,48 @@ of the report now carries the list rather than the phrase "the predicate is repe
 **The load-bearing sentence is "one mechanism answers one condition."** A clearance is
 more expensive than a candidate: a candidate that dies is a bug that was already there,
 while a clearance is a promise about a whole area that every later round reuses.
+
+### Miss — the transform is correct and the decision it feeds is wrong
+
+**The bug.** A helper normalised free-text answers before a matcher decided what they
+meant: lower-case, strip punctuation, split on whitespace. Every step did exactly what
+its name says. Three defects came out of one helper. Stripping `?` turned a hedged
+affirmative into the bare affirmative, so one respondent's qualified answer scored as
+the whole cohort's. Stripping the apostrophe turned a contraction into two words, so a
+negation guard keyed on the contraction stopped matching and the negative answer counted
+as positive. And a bare quantifier answering a negatively-phrased prompt read as assent,
+because the matcher had only ever been written for the positive phrasing.
+
+**Classes that already absorbed it.** A (meaning drift — the normalised value no longer
+denotes what the matcher was written for). The construct table already carried
+*normalizing / stripping transform*, with the right question attached.
+
+**Why the method missed it anyway.** Both were answered once, at the transform, and both
+were answered correctly there. That is the per-instance/per-change mismatch the
+enumerated sweeps exist for: one class question clears a diff carrying nine transforms,
+and reading a transform never surfaces the consumer's rule. Nothing added to
+`seeds-and-slicing.md` — by the rule at the top of this file, a miss on a shape already
+written down is a discipline failure and the patch is workflow.
+
+**Patch — a sixth enumerated sweep, "normalisation" (`SKILL.md`, Phase 3).** Two
+populations, because a row needs both: every function in the diff that transforms
+user-supplied text, and every consumer that compares its output. Per row the reviewer
+runs a **fixed** input set — empty, whitespace only, `0`, a negation with an apostrophe,
+a yes with trailing punctuation, a decimal with a comma, a bare quantifier, two
+separators in a row, mixed case — and records every output beside the decision the
+consumer makes on it. The verdict rule compares rows rather than a row against an
+expectation: **a consumer whose decision changes between two inputs a human would read
+the same way is a candidate.** Each fixed input has such a twin, which is what makes the
+set fixed rather than chosen — a reviewer picking its own inputs picks the ones the
+author already had in mind.
+
+The ledger row is `transform · consumer · input · output · decision · verdict`, one per
+input; an input with no recorded output leaves the row open. The count enters the run
+header as `normalisation N` and the record as `sweeps.normalisation`, so a zero on a
+diff that lower-cases, trims, splits or parses anything is visible as a skipped sweep.
+
+**Stack clauses.** Flutter/Dart: text from a `TextField` is not ASCII — the platform
+keyboards substitute a curly apostrophe and an en dash, so a guard written with the
+ASCII apostrophe stops matching real input while every fixture passes. TypeScript:
+`Number`, `parseFloat` and `parseInt` disagree on the same string — `Number('')` is `0`,
+`parseFloat('1,5')` is `1`, and `parseInt` stops at the first non-digit.

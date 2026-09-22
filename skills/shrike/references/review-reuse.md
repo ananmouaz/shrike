@@ -79,7 +79,13 @@ Save two separate artifacts beside the bundle, without editing its captured file
   second-site pairs and all dependencies of each verdict, family matrices, and every
   finding's stable ID, trigger, proof, status (`open`, `fixed-pending-verification`,
   `verified`, `dismissed-with-evidence`). Store what remains unreviewed explicitly.
-  Freeze each completed round; the next round writes a new ledger linking to it.
+  Freeze each completed round; the next round writes a new ledger linking to it. The
+  **normalisation** sweep has its own row shape, because its verdict is a recorded
+  output rather than a sentence: `transform location · consumer location · input ·
+  output · the consumer's decision on that output · verdict`, one row per input in the
+  fixed set. The verdict compares *rows*, not a row against an expectation — two inputs
+  a human reads the same way whose decisions differ is the finding. An input with no
+  recorded output was not run, and the row stays open.
 
 Put the ledger and snapshot paths in the report and `log_run.sh --note` as well as
 the next reviewer's prompt. This is a handoff protocol, not an automatic dependency
@@ -100,7 +106,7 @@ run-log SHA with no coverage evidence is not a reviewed baseline.
    contract is supported by evidence. Reopen every ledger row depending on a changed
    participant, transitively. Rerun searches that might gain a new caller or sibling;
    the old search results alone cannot prove the population is still complete.
-3. Run Phases 1–5 at full depth on that slice, including all five applicable sweeps.
+3. Run Phases 1–5 at full depth on that slice, including all six applicable sweeps.
    Explicitly recheck every prior finding's trigger and all its family rows, and
    verify its correction has not broken the previously valid cases. Unchanged
    evidence may support a row; a fix author's claim cannot close it.

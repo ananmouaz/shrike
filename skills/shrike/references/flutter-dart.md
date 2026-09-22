@@ -131,6 +131,11 @@ and options; the patterns below are seeds, not universal framework guarantees.
   Enumerate both old caller sets and state each one's new failure behaviour.
 - Platform-conditional code where one platform branch is untested and takes a
   different, wrong path.
+- **Text from a `TextField` is not ASCII.** iOS and Android smart punctuation substitute
+  a curly apostrophe (`’`, U+2019) for `'` and an en dash for `--`, so a negation guard,
+  a `split`, or a `replaceAll` written with the ASCII apostrophe stops matching real
+  input while every test fixture still passes. In the normalisation sweep, run the
+  apostrophe input in both forms.
 
 ## Deterministic tools to run first (Phase 0)
 

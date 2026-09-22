@@ -35,7 +35,7 @@
 #   ts repo branch pr target head base range prev_head files hunks secs round
 #   full_hunt hunks_since_full
 #   candidates killed reported severity{critical,high,medium}
-#   sweeps{post_await,presence,effect_order,second_site,tests_run,tests_red}
+#   sweeps{post_await,presence,effect_order,second_site,normalisation,tests_run,tests_red}
 #   unreviewed note
 
 set -uo pipefail
@@ -136,7 +136,7 @@ fi
 # The header rows are fixed by SKILL.md's output format:
 #   | **Target** | `PR #142` · `abc1234...def5678` |
 #   | **Not reviewed** | ... |
-#   | **Sweeps** | post-await 9 · presence 4 · effect-order 2 · second-site 6 · tests 2 of 2 reverted red |
+#   | **Sweeps** | post-await 9 · presence 4 · effect-order 2 · second-site 6 · normalisation 3 · tests 2 of 2 reverted red |
 #   | **Candidates** | 14 raised → 12 killed in falsification → **2 reported** |
 #   | **Findings** | 🔴 0 critical · 🟠 1 high · 🟡 1 medium |
 first_num_before() {  # first_num_before <word> <text>
@@ -145,7 +145,7 @@ first_num_before() {  # first_num_before <word> <text>
 row_cell() {  # row_cell <RowLabel> <file>  → the second cell of that table row
   grep -E "^\| *\*\*$1\*\* *\|" "$2" | head -1 | sed -E 's/^\| *\*\*[^*]+\*\* *\| *//; s/ *\|? *$//'
 }
-S_POST=""; S_PRES=""; S_EFF=""; S_SITE=""; S_TRUN=""; S_TRED=""
+S_POST=""; S_PRES=""; S_EFF=""; S_SITE=""; S_NORM=""; S_TRUN=""; S_TRED=""
 SEV_C=""; SEV_H=""; SEV_M=""
 if [ -n "$REPORT" ]; then
   if [ ! -r "$REPORT" ]; then
@@ -175,6 +175,7 @@ S_POST=$(sweep_n 'post-await' "$SWEEPS")
 S_PRES=$(sweep_n 'presence' "$SWEEPS")
 S_EFF=$(sweep_n 'effect-order' "$SWEEPS")
 S_SITE=$(sweep_n 'second-site' "$SWEEPS")
+S_NORM=$(sweep_n 'normalisation' "$SWEEPS")
 S_TRED=$(printf '%s\n' "$SWEEPS" | grep -oE 'tests [0-9]+' | head -1 | grep -oE '[0-9]+$')
 S_TRUN=$(printf '%s\n' "$SWEEPS" | grep -oE 'tests [0-9]+ (of|/) ?[0-9]+' | head -1 | grep -oE '[0-9]+$')
 
@@ -225,13 +226,13 @@ fi
 [ -n "$TARGET" ] || TARGET=$([ -n "$PR" ] && echo "PR #$PR" || echo "$BRANCH")
 
 # --- the record --------------------------------------------------------------
-LINE=$(printf '{"ts":%s,"repo":%s,"branch":%s,"pr":%s,"target":%s,"head":%s,"base":%s,"range":%s,"prev_head":%s,"files":%s,"hunks":%s,"secs":%s,"round":%s,"full_hunt":%s,"hunks_since_full":%s,"candidates":%s,"killed":%s,"reported":%s,"severity":{"critical":%s,"high":%s,"medium":%s},"sweeps":{"post_await":%s,"presence":%s,"effect_order":%s,"second_site":%s,"tests_run":%s,"tests_red":%s},"unreviewed":%s,"note":%s}' \
+LINE=$(printf '{"ts":%s,"repo":%s,"branch":%s,"pr":%s,"target":%s,"head":%s,"base":%s,"range":%s,"prev_head":%s,"files":%s,"hunks":%s,"secs":%s,"round":%s,"full_hunt":%s,"hunks_since_full":%s,"candidates":%s,"killed":%s,"reported":%s,"severity":{"critical":%s,"high":%s,"medium":%s},"sweeps":{"post_await":%s,"presence":%s,"effect_order":%s,"second_site":%s,"normalisation":%s,"tests_run":%s,"tests_red":%s},"unreviewed":%s,"note":%s}' \
   "$(str "$(date -u +%Y-%m-%dT%H:%M:%SZ)")" "$(str "$REPO")" "$(str "$BRANCH")" \
   "$(num "$PR")" "$(str "$TARGET")" "$(opt "$HEAD_SHA")" "$(opt "$BASE_SHA")" \
   "$(opt "$RANGE")" "$(opt "$PREV_HEAD")" "$(num "$FILES")" "$(num "$HUNKS")" \
   "$(num "$SECS")" "$(num "$ROUND")" "$(bool "$FULL")" "$(num "$HSF")" "$(num "$CAND")" "$(num "$KILLED")" "$(num "$REPORTED")" \
   "$(num "$SEV_C")" "$(num "$SEV_H")" "$(num "$SEV_M")" \
-  "$(num "$S_POST")" "$(num "$S_PRES")" "$(num "$S_EFF")" "$(num "$S_SITE")" \
+  "$(num "$S_POST")" "$(num "$S_PRES")" "$(num "$S_EFF")" "$(num "$S_SITE")" "$(num "$S_NORM")" \
   "$(num "$S_TRUN")" "$(num "$S_TRED")" \
   "$(opt "$UNREVIEWED")" "$(opt "$NOTE")")
 

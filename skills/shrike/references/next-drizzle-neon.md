@@ -116,6 +116,11 @@ Apply as seeds, then trace and falsify. A pattern match is a question, not a fin
   accepts days that do not exist. Compare the parsed components back to the input.
 - Optional chaining that silently produces `undefined` where a default was intended,
   then flows into arithmetic (`undefined + 1` → `NaN`) or a query.
+- **`Number`, `parseFloat` and `parseInt` disagree on the same string.** `Number('')`
+  and `Number('  ')` are `0`, so an empty field reads as a real zero; `parseFloat('1,5')`
+  is `1`, silently truncating a comma decimal that `Number('1,5')` rejects as `NaN`; and
+  `parseInt` stops at the first non-digit, so `parseInt('5kg')` is `5`. In the
+  normalisation sweep, name which one the code calls before recording its outputs.
 
 ## Money, counters, idempotency
 
