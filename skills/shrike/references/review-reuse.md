@@ -210,8 +210,11 @@ chain were confirmations of a one-line fix, each re-running three full suites to
 it; that is the cost this split removes. A round that widens beyond the fixed scope
 above is a hunt, and is recorded as one.
 
-`SHRIKE_MAX_ROUNDS` is a handoff budget, not a quality criterion. Respect a project's
-explicit continuation policy; never treat hitting the cap as a clean result. Count
+`SHRIKE_MAX_ROUNDS` is a handoff budget, not a quality criterion. A single-surface
+diff spends at most two hunts unless its second hunt reported a finding. At the cap,
+each open finding leaves by fix-and-confirm, human acceptance, or a raised cap — the
+exits are defined in SKILL.md Phase 7. Respect a project's explicit continuation
+policy; never treat hitting the cap as a clean result. Count
 rounds in this review chain, not every historical run on a long-lived branch (the
 existing `log_run.sh --rounds` is a historical count). A rejected candidate count is
 not a quota either: repeat falsification only to fill a specific evidence gap.

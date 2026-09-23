@@ -80,9 +80,10 @@ touches the evidence bar:
    coverage ledger, not just its HEAD. Include dirty changes, prior finding triggers,
    and sibling variants; carry forward only validated, unaffected coverage. See
    Phase 7 and `references/review-reuse.md`.
-3. **The loop is bounded.** At most `SHRIKE_MAX_ROUNDS` rounds (default 3), then the
-   report names what is still open and the caller decides — see Phase 7. An explicit
-   project continuation policy takes precedence. The cap never means clean.
+3. **The loop is bounded.** At most `SHRIKE_MAX_ROUNDS` hunts (default 3), and a
+   single-surface diff stops after 2 unless hunt 2 reported a finding. At the cap the
+   report names what is still open and gives the caller its exits — see Phase 7. An
+   explicit project continuation policy takes precedence. The cap never means clean.
 
 **When preparing evidence for another reviewer or continuing a review chain, read
 `references/review-reuse.md`.** It defines snapshot validation, the coverage ledger,
@@ -662,15 +663,47 @@ beyond the list above is a hunt; call it one and spend the budget.
 `SHRIKE_MAX_ROUNDS` **hunts**, default 3, unless the project explicitly requires further
 rounds. Count this review chain in its ledger; the legacy `report_stats.sh` round
 number counts historical branch records and is not a chain budget.
-When the cap is reached, stop, whatever is still open, and make the report say so: the
-*Not reviewed* row names any delta not hunted, and an **Open** list under the findings
-names each surviving candidate not yet fixed or verified. Never mark a partial review
-clean or write a covering record that a push gate would interpret as clearance.
-The caller decides whether to continue, unless its existing instructions already
-authorize continuation. A clean exit requires complete original coverage, all prior
-findings independently resolved, every family row resolved and a matching current
-snapshot. Never confuse zero new findings, exhausted budget or unchanged HEAD with
-those conditions.
+
+**A single-surface diff stops after two hunts** unless the second hunt reported a
+finding. Single-surface means every changed file belongs to one deployable unit — one
+app, one package, one service — and the parity sweep's population is 0, so no rule in
+the diff is also encoded on another layer. "Reported a finding" means at least one new
+finding survived falsification into the report; candidates killed in Phase 4 and
+findings carried forward from hunt 1 do not count. In one measured chain on a
+single-surface Flutter diff, hunts 1–2 found four real bugs and hunts 3–4 found none
+in 32 minutes. The later hunts were not cheaper and not more likely to find anything.
+A multi-surface diff keeps the full `SHRIKE_MAX_ROUNDS`. Confirmations stay outside
+both budgets, as above.
+
+When the cap is reached, stop hunting, whatever is still open, and make the report say
+so: the *Not reviewed* row names any delta not hunted, and an **Open** list under the
+findings names each surviving candidate not yet fixed or verified. Never mark a partial
+review clean or write a covering record that a push gate would interpret as clearance.
+
+The cap stops hunts, not the chain. Every open finding at the cap leaves by one of
+three exits, and the report lists them so the caller has a path forward:
+
+1. **Fix and confirm.** The author fixes it, and a confirmation verifies the fix. The
+   confirmation is not budgeted, so it runs past the cap.
+2. **Accept.** A human accepts the finding as it stands — risk accepted, fix deferred,
+   or disputed as intended behaviour. Only a human can accept. Shrike, the fixing agent
+   and the calling agent may not accept a finding, and silence is not acceptance. Move
+   it from **Open** to an **Accepted** list: the finding, who accepted it, their stated
+   reason, and the follow-up ticket if one exists. An accepted finding no longer blocks
+   the chain. It reopens if a later push touches its trigger or its family rows.
+3. **Raise the cap.** A human or the project's policy authorizes more hunts, and names
+   how many.
+
+When no finding is left **Open**, the chain closes. Its verdict line is
+`closed — N fixed and confirmed, N accepted` at the last hunted sha, never
+`no correctness bugs found`. A chain with an accepted finding is not clean, and its
+record must not read as clearance to a push gate — put `accepted: N` in the record's
+note. The caller decides whether to continue past the cap, unless its existing
+instructions already authorize continuation.
+
+A clean exit requires complete original coverage, all prior findings independently
+resolved, every family row resolved and a matching current snapshot. Never confuse zero
+new findings, exhausted budget or unchanged HEAD with those conditions.
 
 Whatever stays unreviewed, name it. "Reviewed `abc1234...def5678`; three commits since,
 not hunted" is a usable sentence. Silence reads as coverage.
@@ -705,7 +738,8 @@ says which hunt's fixes it verified and lists what it checked, never a hunk coun
 not work — and carries `full re-read: yes` whenever the round re-hunted the whole
 original target. `log_run.sh` reads the kind, the `N since last full hunt` figure and
 the full-re-read flag out of that row, and derives `hunts_in_chain` from the kind; when the round cap ended the loop with candidates
-still unfixed, an **Open** list follows the findings, one line each.
+still unfixed, an **Open** list follows the findings, one line each, and an
+**Accepted** list follows it once a human has accepted any of them.
 
 The candidates row is what makes the report trustworthy. A run that raised 14 and
 killed 12 is showing its work; a run that reports everything it thought of is not.

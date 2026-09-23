@@ -99,7 +99,7 @@ if [ -x "$LOGGER" ]; then
 fi
 ROUND_NOTE=""
 if [ "$ROUND" != "?" ] && [ "$ROUND" -gt "$MAX_ROUNDS" ] 2>/dev/null; then
-  ROUND_NOTE=" — OVER THE CAP: report what is still open and hand back to the caller"
+  ROUND_NOTE=" — OVER THE CAP: stop hunting; each open finding exits by fix-and-confirm, human acceptance, or a raised cap"
 fi
 
 DELTA="none — no previous report or run record for this branch"
