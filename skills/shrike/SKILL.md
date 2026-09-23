@@ -64,26 +64,48 @@ Run these phases in order. Do not emit any finding before Phase 5.
 
 ### Run shape — avoid repeated work without reducing coverage
 
-Measured over real runs, a hunt is latency-bound on tool round-trips, not on
-reasoning: the median run made about 25 tool calls at about 15 seconds each, and every
-one of them went out alone, one call per message. A run that people skip because it is
-slow has a recall of zero, so cost is a recall problem. Three rules, none of which
+A hunt spends its time in two places, neither of them reasoning. One measured 27-minute
+hunt spent 14 minutes waiting on the full test suite — about 4–6 minutes a run, run
+again after every edit — and 11 minutes writing 107k output tokens of ledger and sweep
+prose into the conversation, one tool call at a time, with no subagent. Diff-comment
+bots finish in about 5 minutes because they do neither. A run that people skip because
+it is slow has a recall of zero, so cost is a recall problem. Six rules, none of which
 touches the evidence bar:
 
 1. **Independent tool calls go out together, in one message.** The sweep greps in
-   Phase 3 read the same diff and do not depend on each other: issue all seven as
+   Phase 3 read the same diff and do not depend on each other: issue them as
    parallel tool calls in a single message and read the results together. The same
    holds for the analyzer runs in Phase 0, the caller greps in Phase 1 (one per changed
    symbol), the file opens for the second-site pairs in Phase 2, and the rebuttal reads
    in Phase 4. Serialise only where one call's input is another call's output.
-2. **A round after the first hunts the affected dependency slice.** Use the previous
+2. **The full suite runs once per hunt, in the background.** Start it in Phase 0 and
+   read its result before Phase 5. Never wait on it, and never run it again in the same
+   round — not after a revert, not after a fix you applied, not "to be sure". Every other
+   test run names the files it needs (sweep 4, Phase 5, a confirmation). Builds, device
+   runs and UI flows are CI's job, not the hunt's; run one only when a candidate cannot be
+   decided any other way, and say which.
+3. **The ledger lives in a file, not in the conversation.** Write every sweep row, pair
+   and clearance to the ledger file, one line per row, in the shapes
+   `references/review-reuse.md` gives. The conversation carries only counts, candidates
+   and the report. A row is written once; the report cites the file, it does not repeat
+   it. Output tokens are the slowest thing a hunt produces, and a ledger reprinted into
+   the chat costs minutes without adding any evidence.
+4. **The sweeps run in two forks.** Where the agent can fork itself with its context
+   intact — Claude Code's `fork` subagent — Phase 3 splits the sweeps across two forks
+   while the main agent traces the Phase 2 seeds. See *Parallel sweeps* in Phase 3. A
+   fork inherits the loaded context as cached input, so it pays no second read of the
+   diff. Where no fork exists, run the sweeps in order in one agent; the rules do not
+   change.
+5. **A round after the first hunts the affected dependency slice.** Use the previous
    coverage ledger, not just its HEAD. Include dirty changes, prior finding triggers,
    and sibling variants; carry forward only validated, unaffected coverage. See
    Phase 7 and `references/review-reuse.md`.
-3. **The loop is bounded.** At most `SHRIKE_MAX_ROUNDS` hunts (default 3), and a
-   single-surface diff stops after 2 unless hunt 2 reported a finding. At the cap the
-   report names what is still open and gives the caller its exits — see Phase 7. An
-   explicit project continuation policy takes precedence. The cap never means clean.
+6. **Rounds after the first are confirmations by default, and the loop is bounded.** A
+   round whose only new code is the fix for open findings is a confirmation, not a hunt
+   — see Phase 7. At most `SHRIKE_MAX_ROUNDS` hunts (default 3), and a single-surface
+   diff stops after 2 unless hunt 2 reported a finding. At the cap the report names what
+   is still open and gives the caller its exits. An explicit project continuation policy
+   takes precedence. The cap never means clean.
 
 **When preparing evidence for another reviewer or continuing a review chain, read
 `references/review-reuse.md`.** It defines snapshot validation, the coverage ledger,
@@ -121,8 +143,20 @@ untracked contents on top. It also clones the author's ignored build caches into
 (`.dart_tool`, `node_modules`, `.venv`, `target`; override with `SHRIKE_WARM_DIRS`), so
 the first test run there is warm — a bare pin paid a dependency fetch and a cold compile,
 about 80 seconds, before it had read a line. Do not run `pub get`, `npm install` or their
-equivalents in the pin unless a tool refuses without it. **Read every file and run every
-check in `$PINNED`.** Touch
+equivalents in the pin unless a tool refuses without it.
+
+A hunt that will run sweep 4 builds a **second pin** for it, in the same command:
+
+```bash
+PINNED=$(python3 <skill>/scripts/review_snapshot.py --base <base> --pin <scratch>/tree) &&
+PINNED_TESTS=$(python3 <skill>/scripts/review_snapshot.py --base <base> --pin <scratch>/tree-tests)
+```
+
+Sweep 4 reverts production hunks, and a revert in `$PINNED` would change what the
+background suite and the other sweeps are reading. Both commands print their bundle path
+on stderr; the bundle is content-addressed, so equal paths mean equal trees. If they
+differ, the author moved between the two captures: unpin both and pin again. **Read every
+file and run every check in `$PINNED`**; apply reverts only in `$PINNED_TESTS`. Touch
 the original worktree only at the very end, to recapture it without `--pin` for the
 drift check — and when it has drifted, say so in the *Not reviewed* row and hunt the
 delta; do not discard a round whose evidence is all still valid. Remove the pin when the
@@ -130,6 +164,7 @@ round closes:
 
 ```bash
 python3 <skill>/scripts/review_snapshot.py --unpin <scratch>/tree
+python3 <skill>/scripts/review_snapshot.py --unpin <scratch>/tree-tests
 ```
 
 For repeated/concurrent runs, set `SHRIKE_START_FILE` to an absolute path in this
@@ -138,9 +173,12 @@ result only with matching inputs, command, tool version and environment as defin
 in `references/review-reuse.md`; otherwise rerun the required check.
 
 This runs whatever the repo has (`dart analyze`, `tsc --noEmit`, `eslint`, `go vet`,
-`cargo check`, `ruff`, `semgrep`) and collects results. Also run the existing test
-suite if it is fast enough to be practical — in the same message as the analyzer pass,
-since neither waits on the other.
+`cargo check`, `ruff`, `semgrep`) and collects results. In the same message, **start
+the full test suite in `$PINNED` as a background job**, with its output going to a file
+in the scratch directory. Do not wait for it: Phases 1–4 go ahead while it runs. Read
+the file before Phase 5, since a red test there is a lead, and a suite still running at
+that point is waited for then. That is the one full-suite run this hunt gets. A
+confirmation does not start one at all.
 
 Use these results two ways: as **findings you no longer need to hunt for** (a type
 error is the compiler's job, not yours), and as **signal about where the change is
@@ -293,9 +331,33 @@ first instance that looks fine. So work them as **enumerations** — build the i
 list, put a verdict on every row, and carry the counts into the report header. A sweep
 reported without its instance list was not run. Each has a construct row in
 `references/seeds-and-slicing.md` stating its question; what follows is the population
-to enumerate and what a row has to say. **Build all seven populations in one message**:
-the greps read the same diff and share nothing, so seven parallel tool calls cost one
-round-trip, not seven.
+to enumerate and what a row has to say. **Build each fork's populations in one
+message**: the greps read the same diff and share nothing, so parallel tool calls cost
+one round-trip, not one each.
+
+#### Parallel sweeps
+
+Once Phase 2 has named its second-site pairs, the main agent launches two forks in one
+message and then traces the Phase 2 seeds itself while they run:
+
+- **Fork A — sweeps 4 and 7.** The test-power reverts and runs, in `$PINNED_TESTS`
+  only, and parity. Most of its time is spent waiting for tests, so it gets the lighter
+  reading.
+- **Fork B — sweeps 1, 2, 3, 5 and 6.** Post-await, presence, effect order, second
+  site and normalisation, all in `$PINNED`. This work is reading, not waiting.
+
+Each fork's prompt names its sweeps, the two pin paths, and its own ledger file,
+`<scratch>/ledger-a.md` or `<scratch>/ledger-b.md`. A fork writes its rows there and
+returns only three things: the count per sweep, each candidate with its second-site
+pair, trigger and the lines it read, and any row it could not close. A fork does not
+falsify, edit `$PINNED`, post, log or unpin; Fork A restores every revert in
+`$PINNED_TESTS` before it returns. The split is only for Phase 3. Falsification needs
+every candidate and every rebuttal read in one place, so it stays in the main agent: do
+not start Phase 4 until both forks have returned, then append both ledger files to the
+round's ledger.
+
+Split the sweeps the same way, two forks and never more, whatever the diff size. A
+larger diff is sliced by subsystem in Phase 1, not by adding forks.
 
 1. **Post-await state.** Population: every `await` in the changed files whose enclosing
    function afterwards touches something captured before it — a local, an instance
@@ -332,6 +394,8 @@ round-trip, not seven.
    fail and the input that reaches it, and check the fixtures actually contain a case
    of the class under test: a setup filter that excludes every input the regression
    would produce is the usual shape, and it reads as a passing test forever.
+   Reverts and their test runs happen in `$PINNED_TESTS`, never in `$PINNED`, and every
+   revert is restored before the sweep closes.
    Two rules keep these runs cheap without touching what they prove. **Run only the
    test file the row names** — `flutter test test/x_test.dart`, `pytest tests/test_x.py`,
    `vitest run src/x.test.ts` — never a directory: a directory-wide run compiles and
@@ -639,9 +703,18 @@ without launching another hunt. Open findings remain open until independently ve
 **Two kinds of round, and only one of them is budgeted.**
 
 A **hunt** is everything this document describes: Phases 1–5 over its scope, all seven
-sweeps with their instance lists, the full suites, a fresh verdict on every row it
-touches. Round 1 is a hunt. So is any round that follows a new push, and so is the
-periodic full re-read.
+sweeps with their instance lists, one background run of the full suite, and a fresh
+verdict on every row it touches. Round 1 is a hunt, and so is the periodic full re-read.
+
+**Every round after the first is a confirmation unless something outside the fixes
+changed.** Sort each hunk since the last hunt: a hunk is *fix delta* when it sits at an
+open finding's **Where** or **Fix** location, in one of its family rows, or in its named
+regression test. When every hunk is fix delta, the round is a confirmation. When some are
+not — a new feature commit, an unrelated edit, a rebase or base change — the round is a
+hunt over the other hunks' dependency slice, and it confirms the fix delta in the same
+pass. A drift over the full re-read threshold, or a human asking for a hunt, also makes
+the round a hunt. When in doubt about one hunk, treat that hunk as new code, not the
+whole round.
 
 A **confirmation** verifies the previous hunt's fixes and nothing else. Its scope is
 fixed, not judged: the **fix delta** (the diff of the fixes themselves, which is

@@ -106,6 +106,15 @@ Save two separate artifacts beside the bundle, without editing its captured file
   verdict is *same*, *differs*, or *not comparable* with the reason; a row holding one
   text, or a *same* with no quoted second text, is open.
 
+  **The ledger is a file, written one line per row.** Every row kind is a single line,
+  fields separated by ` · `, ending in the verdict and the `path:line` evidence: for
+  example `post-await · lib/x.dart:88 · captured _items · refetch can replace it ·
+  re-read at :91 · safe`. Append rows to the file as they are decided. Do not print
+  them into the conversation, and do not restate them in the report; the report gives
+  counts and the ledger path. A quoted text in a parity row is quoted in the file, not
+  in the chat. Forks write `ledger-a.md` and `ledger-b.md`, and the main agent appends
+  both to the round's ledger before falsification.
+
 Put the ledger and snapshot paths in the report and `log_run.sh --note` as well as
 the next reviewer's prompt. This is a handoff protocol, not an automatic dependency
 analyzer: the reviewer owns the ledger and the boundary evidence.
@@ -192,7 +201,10 @@ that record as permission to push. Recheck the snapshot immediately before loggi
 A round is a **hunt** or a **confirmation**, and the two are not interchangeable.
 
 A **hunt** runs Phases 1–5 over its scope with all seven sweeps, their instance lists,
-the full suites, and a fresh verdict on every row it touches. A **confirmation** checks
+one background run of the full suite, and a fresh verdict on every row it touches.
+After round 1, a round is a confirmation by default: it becomes a hunt only when some
+hunk since the last hunt is not fix delta, when the drift rule calls for a full
+re-read, or when a human asks for one (SKILL.md Phase 7). A **confirmation** checks
 the previous hunt's fixes and stops there. Its scope is fixed rather than judged: the fix
 delta, the family matrix rows of each finding being closed, the named regression tests
 for those findings, the tests of the changed files, and a surface typecheck. No full

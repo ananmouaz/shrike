@@ -102,7 +102,7 @@ tries to prove itself wrong.
 
 ## Faster review/fix loops
 
-Repeated reviews use three mechanisms without changing the finding threshold:
+Repeated reviews use these mechanisms without changing the finding threshold:
 
 - **Close the family in the current round.** A missing async state triggers a bounded
   matrix of reachable initial, resolved, refresh and failed-refresh states. All
@@ -123,7 +123,13 @@ Repeated reviews use three mechanisms without changing the finding threshold:
   fixes — fix delta, family matrix rows, named regression tests, changed files' tests,
   surface typecheck — and runs no full suites and no full sweeps. It can close findings
   and raise new ones; it can never call the chain clean. It doesn't spend the round
-  budget, which counts hunts.
+  budget, which counts hunts. Every round after the first is a confirmation unless some
+  hunk since the last hunt is not part of a fix.
+- **Keep the slow parts off the critical path.** The full suite runs once per hunt, in
+  the background, started in Phase 0. The sweep ledger goes to a file, one line per row,
+  never into the conversation. In Claude Code the sweeps split across two forks that
+  inherit the loaded context: one runs the test-power reverts in a second pin, the other
+  does the reading sweeps. Falsification stays in the main agent.
 - **Re-read the whole target on a schedule.** Delta rounds reuse clearances, so a wrong
   one is permanent. `python3 skills/shrike/scripts/chain_state.py --explain` measures the
   drift since the last full hunt; past 20% of its hunks or three hunts, the next round
